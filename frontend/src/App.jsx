@@ -1,17 +1,18 @@
 import {
   createBrowserRouter,
   createRoutesFromElements,
-  RouterProvider, Route
+  RouterProvider, Route,
+  Link
 } from "react-router-dom";
-import Signup from "./Components/Forms/SignUp";
+import SignUp from "./Components/Forms/SignUp";
 import Login from "./Components/Forms/Login";
 import Home from "./Components/Home";
 
 const router = createBrowserRouter(
   createRoutesFromElements(
     <>
-    <Route path="/" element={<h1>Welcome! Go to /signup or /login</h1>} />
-    <Route index='/Signup' element={<Signup />} />
+    <Route index='/SignUp' element={<SignUp />} />
+    <Route path='/SignUp' element={<SignUp />} />
     <Route path='/Login' element={<Login />} />
     <Route path='/Home' element={<Home />} />
     </>
