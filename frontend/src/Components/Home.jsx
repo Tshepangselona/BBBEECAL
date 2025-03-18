@@ -33,6 +33,8 @@ const Home = () => {
   const [showYesModal, setShowYesModal] = useState(false);
   const [ownershipDetails, setOwnershipDetails] = useState(null);
   const [managementDetails, setManagementDetails] = useState(null);
+  const [employmentDetails, setEmploymentDetails] = useState(null); 
+const [yesDetails, setYesDetails] = useState(null); 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -116,6 +118,15 @@ const Home = () => {
   const handleManagementSubmit = (data) => {
     setManagementDetails(data);
     setShowManagementModal(false);
+  };
+  const handleEmploymentSubmit = (data) => {
+    setEmploymentDetails(data);
+    setShowEmploymentModal(false);
+  };
+
+  const handleYesSubmit = (data) => {
+    setYesDetails(data);
+    setShowYesModal(false);
   };
 
   if (loading) {
@@ -296,10 +307,10 @@ const Home = () => {
             {managementDetails ? "Edit Management Details" : "Add Management Details"}
           </button>
         </div>
-      </div>
+      </div> 
 
-      {/* Employment Equity */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+{/* Employment Equity */}
+<div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <h2 className="text-xl font-semibold mb-4">Employment Equity</h2>
         <div className="flex justify-between items-center">
           <p>
@@ -379,7 +390,7 @@ const Home = () => {
           onClose={() => setShowManagementModal(false)}
           onSubmit={handleManagementSubmit}
         />
-      )}
+      )}   
 
       {/* Employment Modal */}
       {showEmploymentModal && (
