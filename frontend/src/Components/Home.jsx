@@ -62,7 +62,9 @@ const Home = ({ companyName }) => {
 
   return (
     <div className="max-w-6xl mx-auto p-4">
+
       {/* Header */}
+
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <h1 className="text-2xl font-bold mb-4">B-BBEE Calculator Dashboard</h1>
         <p className="mb-4">Complete your company information to calculate your B-BBEE score</p>
@@ -78,6 +80,7 @@ const Home = ({ companyName }) => {
       </div>
 
       {/* Company Information */}
+
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <h2 className="text-xl font-semibold mb-4">Company Information</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -98,7 +101,7 @@ const Home = ({ companyName }) => {
               name="yearEnd" 
               value={financialData.yearEnd} 
               onChange={handleInputChange}
-              placeholder="e.g., 31 May 2023"
+              placeholder="e.g., 28 Feb 2023"
               className="w-full p-2 border rounded"
             />
           </div>
@@ -106,6 +109,7 @@ const Home = ({ companyName }) => {
       </div>
 
       {/* Financial Information */}
+
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <h2 className="text-xl font-semibold mb-4">Financial Information</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -268,6 +272,7 @@ const Home = ({ companyName }) => {
       </div>
 
       {/* Ownership Assessment */}
+      
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <h2 className="text-xl font-semibold mb-4">Ownership Assessment</h2>
         <div className="flex justify-between items-center">
