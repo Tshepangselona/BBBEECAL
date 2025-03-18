@@ -10,7 +10,6 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 5000;
 
-// Function to validate DD/MMM/YYYY format
 const validateDateFormat = (dateStr) => {
   const regex = /^(\d{2})\/([A-Za-z]{3})\/(\d{4})$/;
   if (!regex.test(dateStr)) return false;
@@ -19,7 +18,7 @@ const validateDateFormat = (dateStr) => {
   const month = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
     .indexOf(monthStr.toLowerCase()) + 1;
   
-  if (month === 0) return false; // Invalid month
+  if (month === 0) return false;
   const dayNum = parseInt(day);
   const yearNum = parseInt(year);
   
@@ -29,44 +28,47 @@ const validateDateFormat = (dateStr) => {
   return true;
 };
 
-// Signup Route
 app.post("/signup", async (req, res) => {
   const { businessEmail, password, businessName, financialYearEnd, address, contactNumber } = req.body;
 
   try {
-    // Validate the financialYearEnd format
     if (!validateDateFormat(financialYearEnd)) {
-      return res.status(400).json({ 
-        error: "Invalid financial year end format. Please use DD/MMM/YYYY (e.g., 31/Mar/2025)" 
-      });
+      return res.status(400).json({ error: "Invalid financial year end format. Please use DD/MMM/YYYY (e.g., 31/Mar/2025)" });
     }
 
-    // Convert DD/MMM/YYYY to Date object
     const [, day, monthStr, year] = financialYearEnd.match(/^(\d{2})\/([A-Za-z]{3})\/(\d{4})$/);
     const month = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
-      .indexOf(monthStr.toLowerCase());
+      .indexOf(monthStr.toLowerCase()); // 0-based month (0-11)
     const dateObject = new Date(year, month, day);
+
+    if (isNaN(dateObject.getTime())) {
+      return res.status(400).json({ error: "Invalid date value for Financial Year End" });
+    }
 
     const userCredential = await createUserWithEmailAndPassword(auth, businessEmail, password);
     const user = userCredential.user;
 
     await setDoc(doc(db, "users", user.uid), {
       businessName,
-      financialYearEnd: dateObject, // Store as Date object
+      financialYearEnd: dateObject,
       address,
       contactNumber,
       businessEmail,
       createdAt: new Date().toISOString(),
     });
 
-    res.status(201).json({ message: "User created successfully", uid: user.uid, businessName });
+    res.status(201).json({ 
+      message: "User created successfully", 
+      uid: user.uid, 
+      businessName, 
+      financialYearEnd: dateObject 
+    });
   } catch (error) {
-    console.error("Signup error:", error.message);
-    res.status(400).json({ error: error.message });
+    console.error("Signup error:", error.code, error.message);
+    res.status(400).json({ error: error.message, code: error.code });
   }
 });
 
-// Login Route
 app.post("/login", async (req, res) => {
   const { businessEmail, password } = req.body;
 
@@ -74,14 +76,24 @@ app.post("/login", async (req, res) => {
     const userCredential = await signInWithEmailAndPassword(auth, businessEmail, password);
     const user = userCredential.user;
     const userDoc = await getDoc(doc(db, "users", user.uid));
-    const businessName = userDoc.exists() ? userDoc.data().businessName : "";
-    res.status(200).json({ message: "Login successful", uid: user.uid, businessName });
+    
+    if (!userDoc.exists()) {
+      return res.status(404).json({ error: "User data not found" });
+    }
+
+    const userData = userDoc.data();
+    res.status(200).json({ 
+      message: "Login successful", 
+      uid: user.uid, 
+      businessName: userData.businessName, 
+      financialYearEnd: userData.financialYearEnd 
+    });
   } catch (error) {
-    console.error("Login error:", error.message);
+    console.error("Login error:", error.code, error.message);
     if (error.code === "auth/invalid-credential") {
       res.status(401).json({ error: "Invalid email or password" });
     } else {
-      res.status(500).json({ error: "Something went wrong" });
+      res.status(500).json({ error: "Something went wrong", code: error.code });
     }
   }
 });

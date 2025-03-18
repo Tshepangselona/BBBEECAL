@@ -1,13 +1,11 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-
 export default function Login() {
   const [formData, setFormData] = useState({ businessEmail: "", password: "" });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const navigate = useNavigate(); // Add this
-
+  const navigate = useNavigate();
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -18,26 +16,37 @@ export default function Login() {
     console.log("Submit clicked!", formData);
     setError("");
     setSuccess("");
-  
+
     try {
-      console.log("Sending request to backend..."); // Add this
+      console.log("Sending request to backend...");
       const res = await fetch("http://localhost:5000/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
-      console.log("Response received:", res.status); // Add this
+      console.log("Response received:", res.status);
       const data = await res.json();
-  
+
       if (!res.ok) throw new Error(data.error || "Something went wrong");
-      setSuccess(data.message); // You set this twice; remove one
-      navigate("/Home"); // This runs if no error
+
+      setSuccess(data.message);
+      // Pass user data to Dashboard via navigation state
+      navigate("/Home", {
+        state: {
+          userData: {
+            uid: data.uid,
+            businessName: data.businessName,
+            financialYearEnd: data.financialYearEnd, // Timestamp from backend
+          },
+        },
+      });
     } catch (err) {
-      console.error("Error:", err.message); // Add this
+      console.error("Error:", err.message);
       setError(err.message);
     }
   };
-    return (
+
+  return (
     <div className="max-w-md mx-auto mt-10 p-6 bg-white rounded-lg shadow-md">
       <h2 className="text-2xl font-bold mb-6 text-center">Log In</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -65,7 +74,9 @@ export default function Login() {
         >
           Log In
         </button>
-        <p>Already have an account? <Link to="/SignUp">Sign Up</Link></p>
+        <p>
+          Don’t have an account? <Link to="/SignUp" className="text-blue-600">Sign Up</Link>
+        </p>
       </form>
       {error && <p className="mt-4 text-red-500">{error}</p>}
       {success && <p className="mt-4 text-green-500">{success}</p>}

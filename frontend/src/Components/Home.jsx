@@ -1,11 +1,14 @@
-import React, { useState } from 'react';
+import { useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import OwnershipDetails from './OwnershipDetails';
 import ManagementControl from './ManagementControl';
 
-const Home = ({ companyName }) => { // companyName passed as a prop
+const Home = ({ companyName }) => {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [financialData, setFinancialData] = useState({
-    companyName: companyName || '', // Use the prop value, fallback to empty string
-    yearEnd: '', // Start with empty string for user input
+    companyName: companyName || '',
+    yearEnd: '',
     turnover: 0,
     npbt: 0,
     npat: 0,
@@ -25,6 +28,32 @@ const Home = ({ companyName }) => { // companyName passed as a prop
   const [showManagementModal, setShowManagementModal] = useState(false);
   const [ownershipDetails, setOwnershipDetails] = useState(null);
   const [managementDetails, setManagementDetails] = useState(null);
+
+  // Function to format Firestore Timestamp to DD/MMM/YYYY
+  const formatDate = (timestamp) => {
+    if (!timestamp) return "";
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    console.log("Timestamp received:", timestamp, "Converted date:", date);
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = date.toLocaleString("default", { month: "short" });
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
+  // Load data from navigation state
+  useEffect(() => {
+    const userData = location.state?.userData;
+    if (userData) {
+      setFinancialData((prevData) => ({
+        ...prevData,
+        companyName: userData.businessName || prevData.companyName,
+        yearEnd: userData.financialYearEnd ? formatDate(userData.financialYearEnd) : prevData.yearEnd,
+      }));
+    } else {
+      // Redirect to login if no user data is passed
+      navigate("/Login");
+    }
+  }, [location, navigate]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -46,13 +75,10 @@ const Home = ({ companyName }) => { // companyName passed as a prop
 
   return (
     <div className="max-w-6xl mx-auto p-4">
-
       {/* Header */}
-
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <h1 className="text-2xl font-bold mb-4">B-BBEE Calculator Dashboard</h1>
         <p className="mb-4">Complete your company information to calculate your B-BBEE score</p>
-        
         <div className="flex gap-4">
           <button className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
             Start New Assessment
@@ -64,28 +90,26 @@ const Home = ({ companyName }) => { // companyName passed as a prop
       </div>
 
       {/* Company Information */}
-
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <h2 className="text-xl font-semibold mb-4">Company Information</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1">Company Name</label>
-            <input 
-              type="text" 
-              name="companyName" 
-              value={financialData.companyName} 
+            <input
+              type="text"
+              name="companyName"
+              value={financialData.companyName}
               className="w-full p-2 border rounded bg-gray-100"
               disabled // Disable editing since it comes from sign-up
             />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Financial Year End</label>
-            <input 
-              type="text" 
-              name="yearEnd" 
-              value={financialData.yearEnd} 
+            <input
+              type="text"
+              name="yearEnd"
+              value={financialData.yearEnd}
               onChange={handleInputChange}
-              placeholder="e.g., 28 Feb 2023"
               className="w-full p-2 border rounded"
             />
           </div>
@@ -93,16 +117,15 @@ const Home = ({ companyName }) => { // companyName passed as a prop
       </div>
 
       {/* Financial Information */}
-
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <h2 className="text-xl font-semibold mb-4">Financial Information</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1">Turnover / Revenue (R)</label>
-            <input 
-              type="number" 
-              name="turnover" 
-              value={financialData.turnover} 
+            <input
+              type="number"
+              name="turnover"
+              value={financialData.turnover}
               onChange={handleInputChange}
               className="w-full p-2 border rounded"
               placeholder="Enter turnover"
@@ -110,10 +133,10 @@ const Home = ({ companyName }) => { // companyName passed as a prop
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Net Profit Before Tax (R)</label>
-            <input 
-              type="number" 
-              name="npbt" 
-              value={financialData.npbt} 
+            <input
+              type="number"
+              name="npbt"
+              value={financialData.npbt}
               onChange={handleInputChange}
               className="w-full p-2 border rounded"
               placeholder="Enter NPBT"
@@ -121,10 +144,10 @@ const Home = ({ companyName }) => { // companyName passed as a prop
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Net Profit After Tax (R)</label>
-            <input 
-              type="number" 
-              name="npat" 
-              value={financialData.npat} 
+            <input
+              type="number"
+              name="npat"
+              value={financialData.npat}
               onChange={handleInputChange}
               className="w-full p-2 border rounded"
               placeholder="Enter NPAT"
@@ -132,10 +155,10 @@ const Home = ({ companyName }) => { // companyName passed as a prop
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Salaries (R)</label>
-            <input 
-              type="number" 
-              name="salaries" 
-              value={financialData.salaries} 
+            <input
+              type="number"
+              name="salaries"
+              value={financialData.salaries}
               onChange={handleInputChange}
               className="w-full p-2 border rounded"
               placeholder="Enter salaries"
@@ -143,10 +166,10 @@ const Home = ({ companyName }) => { // companyName passed as a prop
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Wages (R)</label>
-            <input 
-              type="number" 
-              name="wages" 
-              value={financialData.wages} 
+            <input
+              type="number"
+              name="wages"
+              value={financialData.wages}
               onChange={handleInputChange}
               className="w-full p-2 border rounded"
               placeholder="Enter wages"
@@ -154,10 +177,10 @@ const Home = ({ companyName }) => { // companyName passed as a prop
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Directors Emoluments (R)</label>
-            <input 
-              type="number" 
-              name="directorsEmoluments" 
-              value={financialData.directorsEmoluments} 
+            <input
+              type="number"
+              name="directorsEmoluments"
+              value={financialData.directorsEmoluments}
               onChange={handleInputChange}
               className="w-full p-2 border rounded"
               placeholder="Enter directors emoluments"
@@ -165,10 +188,10 @@ const Home = ({ companyName }) => { // companyName passed as a prop
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Annual Payroll (R)</label>
-            <input 
-              type="number" 
-              name="annualPayroll" 
-              value={financialData.annualPayroll} 
+            <input
+              type="number"
+              name="annualPayroll"
+              value={financialData.annualPayroll}
               onChange={handleInputChange}
               className="w-full p-2 border rounded"
               placeholder="Enter annual payroll"
@@ -176,10 +199,10 @@ const Home = ({ companyName }) => { // companyName passed as a prop
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Expenses (R)</label>
-            <input 
-              type="number" 
-              name="expenses" 
-              value={financialData.expenses} 
+            <input
+              type="number"
+              name="expenses"
+              value={financialData.expenses}
               onChange={handleInputChange}
               className="w-full p-2 border rounded"
               placeholder="Enter expenses"
@@ -187,10 +210,10 @@ const Home = ({ companyName }) => { // companyName passed as a prop
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Cost of Sales (R)</label>
-            <input 
-              type="number" 
-              name="costOfSales" 
-              value={financialData.costOfSales} 
+            <input
+              type="number"
+              name="costOfSales"
+              value={financialData.costOfSales}
               onChange={handleInputChange}
               className="w-full p-2 border rounded"
               placeholder="Enter cost of sales"
@@ -198,10 +221,10 @@ const Home = ({ companyName }) => { // companyName passed as a prop
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Depreciation (R)</label>
-            <input 
-              type="number" 
-              name="depreciation" 
-              value={financialData.depreciation} 
+            <input
+              type="number"
+              name="depreciation"
+              value={financialData.depreciation}
               onChange={handleInputChange}
               className="w-full p-2 border rounded"
               placeholder="Enter depreciation"
@@ -216,10 +239,10 @@ const Home = ({ companyName }) => { // companyName passed as a prop
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1">Total SDL Payments (R)</label>
-            <input 
-              type="number" 
-              name="sdlPayments" 
-              value={financialData.sdlPayments} 
+            <input
+              type="number"
+              name="sdlPayments"
+              value={financialData.sdlPayments}
               onChange={handleInputChange}
               className="w-full p-2 border rounded"
               placeholder="Enter SDL payments"
@@ -227,10 +250,10 @@ const Home = ({ companyName }) => { // companyName passed as a prop
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Total Leviable Amount (R)</label>
-            <input 
-              type="number" 
-              name="totalLeviableAmount" 
-              value={financialData.totalLeviableAmount} 
+            <input
+              type="number"
+              name="totalLeviableAmount"
+              value={financialData.totalLeviableAmount}
               onChange={handleInputChange}
               className="w-full p-2 border rounded"
               placeholder="Enter total leviable amount"
@@ -244,10 +267,10 @@ const Home = ({ companyName }) => { // companyName passed as a prop
         <h2 className="text-xl font-semibold mb-4">Procurement</h2>
         <div>
           <label className="block text-sm font-medium mb-1">Total Measured Procurement Spend (R)</label>
-          <input 
-            type="number" 
-            name="totalMeasuredProcurementSpend" 
-            value={financialData.totalMeasuredProcurementSpend} 
+          <input
+            type="number"
+            name="totalMeasuredProcurementSpend"
+            value={financialData.totalMeasuredProcurementSpend}
             onChange={handleInputChange}
             className="w-full p-2 border rounded"
             placeholder="Enter total procurement spend"
@@ -256,7 +279,6 @@ const Home = ({ companyName }) => { // companyName passed as a prop
       </div>
 
       {/* Ownership Assessment */}
-      
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <h2 className="text-xl font-semibold mb-4">Ownership Assessment</h2>
         <div className="flex justify-between items-center">
@@ -265,7 +287,7 @@ const Home = ({ companyName }) => { // companyName passed as a prop
               ? `Ownership details added (Black Ownership: ${ownershipDetails.ownershipData.blackOwnershipPercentage}%)`
               : "Add ownership details to calculate your B-BBEE ownership score"}
           </p>
-          <button 
+          <button
             onClick={() => setShowOwnershipModal(true)}
             className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
           >
@@ -283,7 +305,7 @@ const Home = ({ companyName }) => { // companyName passed as a prop
               ? `Management details added (Black Voting Rights: ${managementDetails.managementData.blackVotingRights}%)`
               : "Add management details to calculate your B-BBEE management score"}
           </p>
-          <button 
+          <button
             onClick={() => setShowManagementModal(true)}
             className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
           >
