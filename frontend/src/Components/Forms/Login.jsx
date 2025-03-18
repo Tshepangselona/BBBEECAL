@@ -29,22 +29,22 @@ export default function Login() {
 
       if (!res.ok) throw new Error(data.error || "Something went wrong");
 
-      setSuccess(data.message);
-      // Pass user data to Dashboard via navigation state
-      navigate("/Home", {
-        state: {
-          userData: {
-            uid: data.uid,
-            businessName: data.businessName,
-            financialYearEnd: data.financialYearEnd, // Timestamp from backend
-          },
+      console.log("Raw financialYearEnd from backend:", data.financialYearEnd); // Debug here
+    setSuccess(data.message);
+    navigate("/Home", {
+      state: {
+        userData: {
+          uid: data.uid,
+          businessName: data.businessName,
+          financialYearEnd: data.financialYearEnd, // Pass raw Timestamp object
         },
-      });
-    } catch (err) {
-      console.error("Error:", err.message);
-      setError(err.message);
-    }
-  };
+      },
+    });
+  } catch (err) {
+    console.error("Error:", err.message);
+    setError(err.message);
+  }
+};
 
   return (
     <div className="max-w-md mx-auto mt-10 p-6 bg-white rounded-lg shadow-md">

@@ -3,11 +3,12 @@ import { useLocation, useNavigate } from "react-router-dom";
 import OwnershipDetails from './OwnershipDetails';
 import ManagementControl from './ManagementControl';
 
-const Home = ({ companyName }) => {
+const Home = () => {
   const location = useLocation();
   const navigate = useNavigate();
+
   const [financialData, setFinancialData] = useState({
-    companyName: companyName || '',
+    companyName: '',
     yearEnd: '',
     turnover: 0,
     npbt: 0,
@@ -28,39 +29,79 @@ const Home = ({ companyName }) => {
   const [showManagementModal, setShowManagementModal] = useState(false);
   const [ownershipDetails, setOwnershipDetails] = useState(null);
   const [managementDetails, setManagementDetails] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Function to format Firestore Timestamp to DD/MMM/YYYY
+  // Function to format Firestore Timestamp (serialized or native) to DD/MMM/YYYY
   const formatDate = (timestamp) => {
     if (!timestamp) return "";
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    console.log("Timestamp received:", timestamp, "Converted date:", date);
-    const day = String(date.getDate()).padStart(2, "0");
-    const month = date.toLocaleString("default", { month: "short" });
-    const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
+    try {
+      let date;
+      if (timestamp.seconds !== undefined && timestamp.nanoseconds !== undefined) {
+        console.log("Processing serialized timestamp:", timestamp);
+        date = new Date(timestamp.seconds * 1000); // Convert seconds to milliseconds
+        console.log("Created Date object:", date, "Timestamp in ms:", timestamp.seconds * 1000);
+      } else if (timestamp.toDate) {
+        console.log("Processing native Firestore Timestamp:", timestamp);
+        date = timestamp.toDate();
+      } else {
+        console.log("Processing fallback timestamp:", timestamp);
+        date = new Date(timestamp);
+      }
+
+      console.log("Date after creation:", date);
+      if (isNaN(date.getTime())) {
+        console.error("Date is invalid, getTime():", date.getTime());
+        throw new Error("Invalid date");
+      }
+
+      const day = String(date.getDate()).padStart(2, "0");
+      const month = date.toLocaleString("default", { month: "short" });
+      const year = date.getFullYear();
+      console.log("Formatted components:", { day, month, year });
+      return `${day}/${month}/${year}`;
+    } catch (err) {
+      console.error("Error formatting date:", err, "Timestamp:", timestamp);
+      return "Invalid Date";
+    }
   };
 
   // Load data from navigation state
   useEffect(() => {
     const userData = location.state?.userData;
-    if (userData) {
+    console.log("Raw userData:", userData);
+
+    if (!userData) {
+      console.log("No user data found, redirecting to Login");
+      navigate("/Login", { replace: true });
+      return;
+    }
+
+    try {
+      const formattedYearEnd = userData.financialYearEnd
+        ? formatDate(userData.financialYearEnd)
+        : "";
+      console.log("Formatted yearEnd:", formattedYearEnd);
       setFinancialData((prevData) => ({
         ...prevData,
         companyName: userData.businessName || prevData.companyName,
-        yearEnd: userData.financialYearEnd ? formatDate(userData.financialYearEnd) : prevData.yearEnd,
+        yearEnd: formattedYearEnd || prevData.yearEnd,
       }));
-    } else {
-      // Redirect to login if no user data is passed
-      navigate("/Login");
+      console.log("Updated financialData:", financialData);
+    } catch (err) {
+      setError("Failed to load company data");
+      console.error("Error in useEffect:", err);
+    } finally {
+      setLoading(false);
     }
-  }, [location, navigate]);
+  }, [location, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFinancialData({
-      ...financialData,
-      [name]: name === 'yearEnd' ? value : Number(value) || 0 // Handle string for yearEnd, numbers for others
-    });
+    setFinancialData((prevData) => ({
+      ...prevData,
+      [name]: name === "yearEnd" ? value : Number(value) || 0,
+    }));
   };
 
   const handleOwnershipSubmit = (data) => {
@@ -73,12 +114,36 @@ const Home = ({ companyName }) => {
     setShowManagementModal(false);
   };
 
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <p className="text-lg">Loading...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-6xl mx-auto p-4">
+        <p className="text-red-500">{error}</p>
+        <button
+          onClick={() => navigate("/Login")}
+          className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+        >
+          Return to Login
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-6xl mx-auto p-4">
       {/* Header */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <h1 className="text-2xl font-bold mb-4">B-BBEE Calculator Dashboard</h1>
-        <p className="mb-4">Complete your company information to calculate your B-BBEE score</p>
+        <p className="mb-4">
+          Complete your company information to calculate your B-BBEE score
+        </p>
         <div className="flex gap-4">
           <button className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
             Start New Assessment
@@ -100,7 +165,7 @@ const Home = ({ companyName }) => {
               name="companyName"
               value={financialData.companyName}
               className="w-full p-2 border rounded bg-gray-100"
-              disabled // Disable editing since it comes from sign-up
+              disabled
             />
           </div>
           <div>
@@ -110,6 +175,7 @@ const Home = ({ companyName }) => {
               name="yearEnd"
               value={financialData.yearEnd}
               onChange={handleInputChange}
+              placeholder="e.g., 31/Mar/2025"
               className="w-full p-2 border rounded"
             />
           </div>
@@ -120,116 +186,30 @@ const Home = ({ companyName }) => {
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <h2 className="text-xl font-semibold mb-4">Financial Information</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Turnover / Revenue (R)</label>
-            <input
-              type="number"
-              name="turnover"
-              value={financialData.turnover}
-              onChange={handleInputChange}
-              className="w-full p-2 border rounded"
-              placeholder="Enter turnover"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Net Profit Before Tax (R)</label>
-            <input
-              type="number"
-              name="npbt"
-              value={financialData.npbt}
-              onChange={handleInputChange}
-              className="w-full p-2 border rounded"
-              placeholder="Enter NPBT"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Net Profit After Tax (R)</label>
-            <input
-              type="number"
-              name="npat"
-              value={financialData.npat}
-              onChange={handleInputChange}
-              className="w-full p-2 border rounded"
-              placeholder="Enter NPAT"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Salaries (R)</label>
-            <input
-              type="number"
-              name="salaries"
-              value={financialData.salaries}
-              onChange={handleInputChange}
-              className="w-full p-2 border rounded"
-              placeholder="Enter salaries"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Wages (R)</label>
-            <input
-              type="number"
-              name="wages"
-              value={financialData.wages}
-              onChange={handleInputChange}
-              className="w-full p-2 border rounded"
-              placeholder="Enter wages"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Directors Emoluments (R)</label>
-            <input
-              type="number"
-              name="directorsEmoluments"
-              value={financialData.directorsEmoluments}
-              onChange={handleInputChange}
-              className="w-full p-2 border rounded"
-              placeholder="Enter directors emoluments"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Annual Payroll (R)</label>
-            <input
-              type="number"
-              name="annualPayroll"
-              value={financialData.annualPayroll}
-              onChange={handleInputChange}
-              className="w-full p-2 border rounded"
-              placeholder="Enter annual payroll"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Expenses (R)</label>
-            <input
-              type="number"
-              name="expenses"
-              value={financialData.expenses}
-              onChange={handleInputChange}
-              className="w-full p-2 border rounded"
-              placeholder="Enter expenses"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Cost of Sales (R)</label>
-            <input
-              type="number"
-              name="costOfSales"
-              value={financialData.costOfSales}
-              onChange={handleInputChange}
-              className="w-full p-2 border rounded"
-              placeholder="Enter cost of sales"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Depreciation (R)</label>
-            <input
-              type="number"
-              name="depreciation"
-              value={financialData.depreciation}
-              onChange={handleInputChange}
-              className="w-full p-2 border rounded"
-              placeholder="Enter depreciation"
-            />
-          </div>
+          {[
+            { name: "turnover", label: "Turnover / Revenue (R)", placeholder: "Enter turnover" },
+            { name: "npbt", label: "Net Profit Before Tax (R)", placeholder: "Enter NPBT" },
+            { name: "npat", label: "Net Profit After Tax (R)", placeholder: "Enter NPAT" },
+            { name: "salaries", label: "Salaries (R)", placeholder: "Enter salaries" },
+            { name: "wages", label: "Wages (R)", placeholder: "Enter wages" },
+            { name: "directorsEmoluments", label: "Directors Emoluments (R)", placeholder: "Enter directors emoluments" },
+            { name: "annualPayroll", label: "Annual Payroll (R)", placeholder: "Enter annual payroll" },
+            { name: "expenses", label: "Expenses (R)", placeholder: "Enter expenses" },
+            { name: "costOfSales", label: "Cost of Sales (R)", placeholder: "Enter cost of sales" },
+            { name: "depreciation", label: "Depreciation (R)", placeholder: "Enter depreciation" },
+          ].map((field) => (
+            <div key={field.name}>
+              <label className="block text-sm font-medium mb-1">{field.label}</label>
+              <input
+                type="number"
+                name={field.name}
+                value={financialData[field.name]}
+                onChange={handleInputChange}
+                className="w-full p-2 border rounded"
+                placeholder={field.placeholder}
+              />
+            </div>
+          ))}
         </div>
       </div>
 
@@ -347,15 +327,13 @@ const Home = ({ companyName }) => {
         </div>
       </div>
 
-      {/* Ownership Modal */}
+      {/* Modals */}
       {showOwnershipModal && (
         <OwnershipDetails
           onClose={() => setShowOwnershipModal(false)}
           onSubmit={handleOwnershipSubmit}
         />
       )}
-
-      {/* Management Modal */}
       {showManagementModal && (
         <ManagementControl
           onClose={() => setShowManagementModal(false)}

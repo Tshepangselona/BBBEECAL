@@ -28,6 +28,8 @@ const validateDateFormat = (dateStr) => {
   return true;
 };
 
+//SignUp route
+
 app.post("/signup", async (req, res) => {
   const { businessEmail, password, businessName, financialYearEnd, address, contactNumber } = req.body;
 
@@ -69,6 +71,8 @@ app.post("/signup", async (req, res) => {
   }
 });
 
+//Login route
+
 app.post("/login", async (req, res) => {
   const { businessEmail, password } = req.body;
 
@@ -82,6 +86,11 @@ app.post("/login", async (req, res) => {
     }
 
     const userData = userDoc.data();
+    console.log("Login response data:", { 
+      uid: user.uid, 
+      businessName: userData.businessName, 
+      financialYearEnd: userData.financialYearEnd 
+    });
     res.status(200).json({ 
       message: "Login successful", 
       uid: user.uid, 
@@ -97,5 +106,4 @@ app.post("/login", async (req, res) => {
     }
   }
 });
-
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
