@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const ManagementControl = ({ onClose, onSubmit }) => {
+const ManagementControl = ({ userId, onClose, onSubmit }) => {
   const [managers, setManagers] = useState([]);
   const [newManager, setNewManager] = useState({
     name: '',
@@ -37,7 +37,8 @@ const ManagementControl = ({ onClose, onSubmit }) => {
       return;
     }
 
-    setManagers([...managers, newManager]);
+    const updatedManagers = [...managers, newManager];
+    setManagers(updatedManagers);
     setNewManager({
       name: '',
       siteLocation: '',
@@ -52,7 +53,7 @@ const ManagementControl = ({ onClose, onSubmit }) => {
       isIndependentNonExecutive: false
     });
 
-    recalculateManagementData([...managers, newManager]);
+    recalculateManagementData(updatedManagers);
   };
 
   const recalculateManagementData = (updatedManagers) => {
@@ -63,9 +64,7 @@ const ManagementControl = ({ onClose, onSubmit }) => {
 
     updatedManagers.forEach((manager) => {
       const votingRights = Number(manager.votingRights);
-
       totalVotingRights += votingRights;
-
       if (manager.race.toLowerCase() === 'black') {
         blackVotingRights += votingRights;
         if (manager.gender.toLowerCase() === 'female') {
@@ -93,10 +92,44 @@ const ManagementControl = ({ onClose, onSubmit }) => {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onSubmit({ managers, managementData });
-    onClose();
+    console.log('Submitting data:', { userId, managers, managementData });
+
+    if (!userId) {
+      alert('User ID is missing. Please ensure you are logged in.');
+      return;
+    }
+
+    try {
+      const response = await fetch('http://localhost:5000/management-control', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
+          managers,
+          managementData
+        }),
+      });
+
+      console.log('Response status:', response.status);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Error response:', errorData);
+        throw new Error(`Failed to save management control data: ${errorData.error || 'Unknown error'}`);
+      }
+
+      const result = await response.json();
+      console.log('Management control data saved:', result);
+      onSubmit({ managers, managementData });
+      onClose();
+    } catch (error) {
+      console.error('Error saving management control data:', error);
+      alert(`Failed to save management control data: ${error.message}`);
+    }
   };
 
   return (
@@ -252,7 +285,7 @@ const ManagementControl = ({ onClose, onSubmit }) => {
                       <th className="border border-gray-300 px-4 py-2">Name & Surname</th>
                       <th className="border border-gray-300 px-4 py-2">Site/Location</th>
                       <th className="border border-gray-300 px-4 py-2">ID Number</th>
-                      <th className="border border-gray-300 px-4 py-2">Position (Occupational Level)</th>
+                      <th className="border border-gray-300 px-4 py-2">Position</th>
                       <th className="border border-gray-300 px-4 py-2">Job Title</th>
                       <th className="border border-gray-300 px-4 py-2">Race</th>
                       <th className="border border-gray-300 px-4 py-2">Gender</th>
@@ -343,7 +376,7 @@ const ManagementControl = ({ onClose, onSubmit }) => {
             </div>
           </div>
 
-          <div className="fixed bottom-20 right-4 flex justify-end gap-4 bg-white p-4 rounded-md shadow-lg">
+          <div className="flex justify-end gap-4">
             <button
               type="button"
               onClick={onClose}
@@ -355,7 +388,7 @@ const ManagementControl = ({ onClose, onSubmit }) => {
               type="submit"
               className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
             >
-              Save Ownership Details
+              Save Management Details
             </button>
           </div>
         </form>
