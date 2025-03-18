@@ -4,6 +4,7 @@ import OwnershipDetails from './OwnershipDetails';
 import ManagementControl from './ManagementControl';
 import EmploymentEquity from './EmploymentEquity';
 import Yes4YouthInitiative from './Yes4YouthInitiative';
+import SkillsDevelopment  from "./SkillsDevelopment";
 
 const Home = () => {
   const location = useLocation();
@@ -32,10 +33,12 @@ const Home = () => {
   const [showManagementModal, setShowManagementModal] = useState(false);
   const [showEmploymentModal, setShowEmploymentModal] = useState(false);
   const [showYesModal, setShowYesModal] = useState(false);
+  const [showSkillsDevelopmentModal, setShowSkillsDevelopmentModal] = useState(false);
   const [ownershipDetails, setOwnershipDetails] = useState(null);
   const [managementDetails, setManagementDetails] = useState(null);
   const [employmentDetails, setEmploymentDetails] = useState(null);
   const [yesDetails, setYesDetails] = useState(null);
+  const [skillsDevelopmentDetails, setSkillsDevelopmentDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -134,6 +137,10 @@ const Home = () => {
   const handleYesSubmit = (data) => {
     setYesDetails(data);
     setShowYesModal(false);
+  };
+  const handleSkillsDevelopmentSubmit = (data) => {
+    setSkillsDevelopmentDetails(data);
+    setShowSkillsDevelopmentModal(false);
   };
 
   if (loading) {
@@ -236,33 +243,33 @@ const Home = () => {
       </div>
 
       {/* Skills Development */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <h2 className="text-xl font-semibold mb-4">Skills Development</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Total SDL Payments (R)</label>
-            <input
-              type="number"
-              name="sdlPayments"
-              value={financialData.sdlPayments}
-              onChange={handleInputChange}
-              className="w-full p-2 border rounded"
-              placeholder="Enter SDL payments"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Total Leviable Amount (R)</label>
-            <input
-              type="number"
-              name="totalLeviableAmount"
-              value={financialData.totalLeviableAmount}
-              onChange={handleInputChange}
-              className="w-full p-2 border rounded"
-              placeholder="Enter total leviable amount"
-            />
-          </div>
+    <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+      <h2 className="text-xl font-semibold mb-4">Skills Development</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium mb-1">Total SDL Payments (R)</label>
+          <input
+            type="number"
+            name="sdlPayments"
+            value={financialData.sdlPayments}
+            onChange={handleInputChange}
+            className="w-full p-2 border rounded"
+            placeholder="Enter SDL payments"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Total Leviable Amount (R)</label>
+          <input
+            type="number"
+            name="totalLeviableAmount"
+            value={financialData.totalLeviableAmount}
+            onChange={handleInputChange}
+            className="w-full p-2 border rounded"
+            placeholder="Enter total leviable amount"
+          />
         </div>
       </div>
+    </div>
 
       {/* Procurement */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
@@ -353,15 +360,22 @@ const Home = () => {
       </div>
 
       {/* Skills Development Details */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <h2 className="text-xl font-semibold mb-4">Skills Development Details</h2>
-        <div className="flex justify-between items-center">
-          <p>Add skills development details to calculate your B-BBEE skills development score</p>
-          <button className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
-            Add Skills Development Details
-          </button>
-        </div>
+    <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+      <h2 className="text-xl font-semibold mb-4">Skills Development Details</h2>
+      <div className="flex justify-between items-center">
+        <p>
+          {skillsDevelopmentDetails?.summary
+            ? `Skills development details added (Total Trainings: ${skillsDevelopmentDetails.summary.totalTrainings})`
+            : "Add skills development details to calculate your B-BBEE skills development score"}
+        </p>
+        <button
+          onClick={() => setShowSkillsDevelopmentModal(true)}
+          className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+        >
+          {skillsDevelopmentDetails ? "Edit Skills Development Details" : "Add Skills Development Details"}
+        </button>
       </div>
+    </div>
 
       {/* Enterprise & Supplier Development */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
@@ -412,13 +426,20 @@ const Home = () => {
         />
       )}
 
-      {/* Submit Button */}
-      <div className="flex justify-center mt-6">
-        <button className="bg-green-600 text-white px-8 py-3 rounded-md hover:bg-green-700 font-bold text-lg">
-          Calculate B-BBEE Score
-        </button>
-      </div>
+{showSkillsDevelopmentModal && (
+      <SkillsDevelopment
+        onClose={() => setShowSkillsDevelopmentModal(false)}
+        onSubmit={handleSkillsDevelopmentSubmit}
+      />
+    )} {/* New modal for Skills Development */}
+
+    {/* Submit Button */}
+    <div className="flex justify-center mt-6">
+      <button className="bg-green-600 text-white px-8 py-3 rounded-md hover:bg-green-700 font-bold text-lg">
+        Calculate B-BBEE Score
+      </button>
     </div>
+  </div>
   );
 };
 
