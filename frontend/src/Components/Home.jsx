@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import OwnershipDetails from './OwnershipDetails';
 import ManagementControl from './ManagementControl';
+import EmploymentEquity from './EmploymentEquity';
+import Yes4YouthInitiative from './Yes4YouthInitiative';
 
 const Home = () => {
   const location = useLocation();
@@ -27,8 +29,12 @@ const Home = () => {
 
   const [showOwnershipModal, setShowOwnershipModal] = useState(false);
   const [showManagementModal, setShowManagementModal] = useState(false);
+  const [showEmploymentModal, setShowEmploymentModal] = useState(false);
+  const [showYesModal, setShowYesModal] = useState(false);
   const [ownershipDetails, setOwnershipDetails] = useState(null);
   const [managementDetails, setManagementDetails] = useState(null);
+  const [employmentDetails, setEmploymentDetails] = useState(null); 
+const [yesDetails, setYesDetails] = useState(null); 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -112,6 +118,15 @@ const Home = () => {
   const handleManagementSubmit = (data) => {
     setManagementDetails(data);
     setShowManagementModal(false);
+  };
+  const handleEmploymentSubmit = (data) => {
+    setEmploymentDetails(data);
+    setShowEmploymentModal(false);
+  };
+
+  const handleYesSubmit = (data) => {
+    setYesDetails(data);
+    setShowYesModal(false);
   };
 
   if (loading) {
@@ -292,6 +307,42 @@ const Home = () => {
             {managementDetails ? "Edit Management Details" : "Add Management Details"}
           </button>
         </div>
+      </div> 
+
+{/* Employment Equity */}
+<div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 className="text-xl font-semibold mb-4">Employment Equity</h2>
+        <div className="flex justify-between items-center">
+          <p>
+            {employmentDetails?.employmentData
+              ? `Employment details added (Total Employees: ${employmentDetails.employmentData.totalEmployees})`
+              : "Add employment details to calculate your B-BBEE employment equity score"}
+          </p>
+          <button 
+            onClick={() => setShowEmploymentModal(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+          >
+            {employmentDetails ? "Edit Employment Details" : "Add Employment Details"}
+          </button>
+        </div>
+      </div>
+
+      {/* Yes 4 Youth Initiative */}
+      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 className="text-xl font-semibold mb-4">Yes 4 Youth Initiative</h2>
+        <div className="flex justify-between items-center">
+          <p>
+            {yesDetails?.yesData
+              ? `YES details added (Total Participants: ${yesDetails.yesData.totalParticipants})`
+              : "Add YES initiative details to calculate your B-BBEE YES contribution"}
+          </p>
+          <button 
+            onClick={() => setShowYesModal(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+          >
+            {yesDetails ? "Edit YES Details" : "Add YES Details"}
+          </button>
+        </div>
       </div>
 
       {/* Skills Development Details */}
@@ -338,6 +389,22 @@ const Home = () => {
         <ManagementControl
           onClose={() => setShowManagementModal(false)}
           onSubmit={handleManagementSubmit}
+        />
+      )}   
+
+      {/* Employment Modal */}
+      {showEmploymentModal && (
+        <EmploymentEquity
+          onClose={() => setShowEmploymentModal(false)}
+          onSubmit={handleEmploymentSubmit}
+        />
+      )}
+
+      {/* Yes 4 Youth Modal */}
+      {showYesModal && (
+        <Yes4YouthInitiative
+          onClose={() => setShowYesModal(false)}
+          onSubmit={handleYesSubmit}
         />
       )}
 
