@@ -41,13 +41,12 @@ export default function Signup() {
     e.preventDefault();
     setError("");
     setSuccess("");
-
-    // Validate date format before submission
+  
     if (!validateDateFormat(formData.financialYearEnd)) {
       setError("Please enter Financial Year End in DD/MMM/YYYY format (e.g., 31/Mar/2025)");
       return;
     }
-
+  
     try {
       const res = await fetch("http://localhost:5000/signup", {
         method: "POST",
@@ -55,18 +54,30 @@ export default function Signup() {
         body: JSON.stringify(formData),
       });
       const data = await res.json();
-
+  
       if (!res.ok) {
         throw new Error(data.error || "Signup failed");
       }
-
+  
       setSuccess(data.message);
-      navigate("/Home");
+      const [, day, monthStr, year] = formData.financialYearEnd.match(/^(\d{2})\/([A-Za-z]{3})\/(\d{4})$/);
+      const month = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
+        .indexOf(monthStr.toLowerCase()); // 0-based month
+      const dateObject = new Date(year, month, day);
+  
+      navigate("/Home", { 
+        state: { 
+          userData: { 
+            businessName: formData.businessName, 
+            financialYearEnd: dateObject 
+          } 
+        } 
+      });
     } catch (err) {
       setError(err.message);
     }
   };
-
+  
   return (
     <div className="max-w-md mx-auto mt-10 p-6 bg-white rounded-lg shadow-md">
       <h2 className="text-2xl font-bold mb-6 text-center">Sign Up</h2>
