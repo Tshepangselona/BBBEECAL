@@ -931,7 +931,7 @@ const OwnershipDetails = ({ onClose, onSubmit }) => {
             </div>
           </div>
 
-          <div className="flex justify-end gap-4">
+          <div className="fixed bottom-20 right-4 flex justify-end gap-4 bg-white p-4 rounded-md shadow-lg">
             <button
               type="button"
               onClick={onClose}
