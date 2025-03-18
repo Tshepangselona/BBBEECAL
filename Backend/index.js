@@ -2,11 +2,17 @@ const express = require("express");
 const cors = require("cors");
 const { auth, db } = require("./firebase");
 const { createUserWithEmailAndPassword, signInWithEmailAndPassword } = require("firebase/auth");
-const { doc, setDoc, getDoc } = require("firebase/firestore");
+const { doc, setDoc, getDoc, collection, addDoc, query, where, getDocs } = require("firebase/firestore");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Log all incoming requests
+app.use((req, res, next) => {
+  console.log(`Incoming request: ${req.method} ${req.url}`);
+  next();
+});
 
 const PORT = process.env.PORT || 5000;
 
@@ -28,8 +34,7 @@ const validateDateFormat = (dateStr) => {
   return true;
 };
 
-//SignUp route
-
+// SignUp route
 app.post("/signup", async (req, res) => {
   const { businessEmail, password, businessName, financialYearEnd, address, contactNumber } = req.body;
 
@@ -40,7 +45,7 @@ app.post("/signup", async (req, res) => {
 
     const [, day, monthStr, year] = financialYearEnd.match(/^(\d{2})\/([A-Za-z]{3})\/(\d{4})$/);
     const month = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
-      .indexOf(monthStr.toLowerCase()); // 0-based month (0-11)
+      .indexOf(monthStr.toLowerCase());
     const dateObject = new Date(year, month, day);
 
     if (isNaN(dateObject.getTime())) {
@@ -71,8 +76,7 @@ app.post("/signup", async (req, res) => {
   }
 });
 
-//Login route
-
+// Login route
 app.post("/login", async (req, res) => {
   const { businessEmail, password } = req.body;
 
@@ -86,11 +90,6 @@ app.post("/login", async (req, res) => {
     }
 
     const userData = userDoc.data();
-    console.log("Login response data:", { 
-      uid: user.uid, 
-      businessName: userData.businessName, 
-      financialYearEnd: userData.financialYearEnd 
-    });
     res.status(200).json({ 
       message: "Login successful", 
       uid: user.uid, 
@@ -106,4 +105,100 @@ app.post("/login", async (req, res) => {
     }
   }
 });
+
+// Test route to confirm server is working
+app.get('/test', (req, res) => {
+  res.status(200).json({ message: 'Test route working' });
+});
+
+// Management Control - Create
+app.post("/management-control", async (req, res) => {
+  console.log("Management control POST hit with body:", req.body);
+  const { userId, managers, managementData } = req.body;
+
+  try {
+    if (!userId) {
+      console.log("Missing userId");
+      return res.status(400).json({ error: "User ID is required" });
+    }
+    if (!managers || !Array.isArray(managers)) {
+      console.log("Invalid managers data");
+      return res.status(400).json({ error: "Managers must be an array" });
+    }
+
+    const userDoc = await getDoc(doc(db, "users", userId));
+    if (!userDoc.exists()) {
+      console.log("User not found for userId:", userId);
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const managementControlData = {
+      userId,
+      managers: managers.map(manager => ({
+        name: manager.name,
+        siteLocation: manager.siteLocation || "",
+        idNumber: manager.idNumber,
+        position: manager.position,
+        jobTitle: manager.jobTitle || "",
+        race: manager.race || "",
+        gender: manager.gender || "",
+        isDisabled: manager.isDisabled || false,
+        votingRights: Number(manager.votingRights) || 0,
+        isExecutiveDirector: manager.isExecutiveDirector || false,
+        isIndependentNonExecutive: manager.isIndependentNonExecutive || false
+      })),
+      managementData: {
+        totalVotingRights: Number(managementData.totalVotingRights) || 0,
+        blackVotingRights: Number(managementData.blackVotingRights) || 0,
+        blackFemaleVotingRights: Number(managementData.blackFemaleVotingRights) || 0,
+        disabledVotingRights: Number(managementData.disabledVotingRights) || 0
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    const docRef = await addDoc(collection(db, "managementControl"), managementControlData);
+
+    res.status(201).json({
+      message: "Management control data saved successfully",
+      id: docRef.id,
+      ...managementControlData
+    });
+  } catch (error) {
+    console.error("Detailed error:", error);
+    res.status(400).json({ error: error.message, code: error.code });
+  }
+});
+
+
+// Management Control - Retrieve
+app.get("/management-control/:userId", async (req, res) => {  const { userId } = req.params;
+
+  try {
+    const managementRef = collection(db, "managementControl");
+    const q = query(managementRef, where("userId", "==", userId));
+    const querySnapshot = await getDocs(q);
+    
+    const managementRecords = [];
+    querySnapshot.forEach((doc) => {
+      managementRecords.push({
+        id: doc.id,
+        ...doc.data()
+      });
+    });
+
+    if (managementRecords.length === 0) {
+      return res.status(404).json({ message: "No management control data found for this user" });
+    }
+
+    res.status(200).json({
+      message: "Management control data retrieved successfully",
+      data: managementRecords
+    });
+  } catch (error) {
+    console.error("Management control retrieval error:", error.code, error.message);
+    res.status(500).json({ error: error.message, code: error.code });
+  }
+});
+
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

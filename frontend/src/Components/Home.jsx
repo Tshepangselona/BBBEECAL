@@ -27,14 +27,15 @@ const Home = () => {
     totalMeasuredProcurementSpend: 0,
   });
 
+  const [userId, setUserId] = useState(null);
   const [showOwnershipModal, setShowOwnershipModal] = useState(false);
   const [showManagementModal, setShowManagementModal] = useState(false);
   const [showEmploymentModal, setShowEmploymentModal] = useState(false);
   const [showYesModal, setShowYesModal] = useState(false);
   const [ownershipDetails, setOwnershipDetails] = useState(null);
   const [managementDetails, setManagementDetails] = useState(null);
-  const [employmentDetails, setEmploymentDetails] = useState(null); 
-const [yesDetails, setYesDetails] = useState(null); 
+  const [employmentDetails, setEmploymentDetails] = useState(null);
+  const [yesDetails, setYesDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -45,7 +46,7 @@ const [yesDetails, setYesDetails] = useState(null);
       let date;
       if (timestamp.seconds !== undefined && timestamp.nanoseconds !== undefined) {
         console.log("Processing serialized timestamp:", timestamp);
-        date = new Date(timestamp.seconds * 1000); // Convert seconds to milliseconds
+        date = new Date(timestamp.seconds * 1000);
         console.log("Created Date object:", date, "Timestamp in ms:", timestamp.seconds * 1000);
       } else if (timestamp.toDate) {
         console.log("Processing native Firestore Timestamp:", timestamp);
@@ -77,31 +78,36 @@ const [yesDetails, setYesDetails] = useState(null);
     const userData = location.state?.userData;
     console.log("Raw userData:", userData);
 
-    if (!userData) {
-      console.log("No user data found, redirecting to Login");
+    if (!userData || !userData.uid) {
+      console.log("No user data or UID found, redirecting to Login");
       navigate("/Login", { replace: true });
       return;
     }
 
     try {
+      setUserId(userData.uid);
       const formattedYearEnd = userData.financialYearEnd
         ? formatDate(userData.financialYearEnd)
         : "";
       console.log("Formatted yearEnd:", formattedYearEnd);
-      setFinancialData((prevData) => ({
-        ...prevData,
-        companyName: userData.businessName || prevData.companyName,
-        yearEnd: formattedYearEnd || prevData.yearEnd,
-      }));
-      console.log("Updated financialData:", financialData);
+      setFinancialData((prevData) => {
+        const updatedData = {
+          ...prevData,
+          companyName: userData.businessName || prevData.companyName,
+          yearEnd: formattedYearEnd || prevData.yearEnd,
+        };
+        console.log("Updated financialData:", updatedData);
+        return updatedData;
+      });
     } catch (err) {
       setError("Failed to load company data");
       console.error("Error in useEffect:", err);
     } finally {
       setLoading(false);
     }
-  }, [location, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [location, navigate]);
 
+  // ... Rest of your component (handleInputChange, handleSubmit functions, JSX) remains unchanged ...
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFinancialData((prevData) => ({
@@ -119,6 +125,7 @@ const [yesDetails, setYesDetails] = useState(null);
     setManagementDetails(data);
     setShowManagementModal(false);
   };
+
   const handleEmploymentSubmit = (data) => {
     setEmploymentDetails(data);
     setShowEmploymentModal(false);
@@ -307,10 +314,10 @@ const [yesDetails, setYesDetails] = useState(null);
             {managementDetails ? "Edit Management Details" : "Add Management Details"}
           </button>
         </div>
-      </div> 
+      </div>
 
-{/* Employment Equity */}
-<div className="bg-white rounded-lg shadow-md p-6 mb-6">
+      {/* Employment Equity */}
+      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <h2 className="text-xl font-semibold mb-4">Employment Equity</h2>
         <div className="flex justify-between items-center">
           <p>
@@ -318,7 +325,7 @@ const [yesDetails, setYesDetails] = useState(null);
               ? `Employment details added (Total Employees: ${employmentDetails.employmentData.totalEmployees})`
               : "Add employment details to calculate your B-BBEE employment equity score"}
           </p>
-          <button 
+          <button
             onClick={() => setShowEmploymentModal(true)}
             className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
           >
@@ -336,7 +343,7 @@ const [yesDetails, setYesDetails] = useState(null);
               ? `YES details added (Total Participants: ${yesDetails.yesData.totalParticipants})`
               : "Add YES initiative details to calculate your B-BBEE YES contribution"}
           </p>
-          <button 
+          <button
             onClick={() => setShowYesModal(true)}
             className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
           >
@@ -387,20 +394,17 @@ const [yesDetails, setYesDetails] = useState(null);
       )}
       {showManagementModal && (
         <ManagementControl
+          userId={userId} // Pass userId here
           onClose={() => setShowManagementModal(false)}
           onSubmit={handleManagementSubmit}
         />
-      )}   
-
-      {/* Employment Modal */}
+      )}
       {showEmploymentModal && (
         <EmploymentEquity
           onClose={() => setShowEmploymentModal(false)}
           onSubmit={handleEmploymentSubmit}
         />
       )}
-
-      {/* Yes 4 Youth Modal */}
       {showYesModal && (
         <Yes4YouthInitiative
           onClose={() => setShowYesModal(false)}
