@@ -1,39 +1,47 @@
 import React, { useState } from 'react';
 import OwnershipDetails from './OwnershipDetails';
+import ManagementControl from './ManagementControl';
 
-const Home = () => {
+const Home = ({ companyName }) => { // companyName passed as a prop
   const [financialData, setFinancialData] = useState({
-    companyName: "",
-    yearEnd: "",
-    turnover: "",
-    npbt: "",
-    npat: "",
-    salaries: "",
-    wages: "",
-    directorsEmoluments: "",
-    annualPayroll: "",
-    expenses: "",
-    costOfSales: "",
-    depreciation: "",
-    sdlPayments: "",
-    totalLeviableAmount: "",
-    totalMeasuredProcurementSpend: "",
+    companyName: companyName || '', // Use the prop value, fallback to empty string
+    yearEnd: '', // Start with empty string for user input
+    turnover: 0,
+    npbt: 0,
+    npat: 0,
+    salaries: 0,
+    wages: 0,
+    directorsEmoluments: 0,
+    annualPayroll: 0,
+    expenses: 0,
+    costOfSales: 0,
+    depreciation: 0,
+    sdlPayments: 0,
+    totalLeviableAmount: 0,
+    totalMeasuredProcurementSpend: 0,
   });
 
   const [showOwnershipModal, setShowOwnershipModal] = useState(false);
+  const [showManagementModal, setShowManagementModal] = useState(false);
   const [ownershipDetails, setOwnershipDetails] = useState(null);
+  const [managementDetails, setManagementDetails] = useState(null);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFinancialData({
       ...financialData,
-      [name]: value
+      [name]: name === 'yearEnd' ? value : Number(value) || 0 // Handle string for yearEnd, numbers for others
     });
   };
 
   const handleOwnershipSubmit = (data) => {
     setOwnershipDetails(data);
     setShowOwnershipModal(false);
+  };
+
+  const handleManagementSubmit = (data) => {
+    setManagementDetails(data);
+    setShowManagementModal(false);
   };
 
   return (
@@ -63,8 +71,8 @@ const Home = () => {
               type="text" 
               name="companyName" 
               value={financialData.companyName} 
-              onChange={handleInputChange}
-              className="w-full p-2 border rounded"
+              className="w-full p-2 border rounded bg-gray-100"
+              disabled // Disable editing since it comes from sign-up
             />
           </div>
           <div>
@@ -74,6 +82,7 @@ const Home = () => {
               name="yearEnd" 
               value={financialData.yearEnd} 
               onChange={handleInputChange}
+              placeholder="e.g., 31 May 2023"
               className="w-full p-2 border rounded"
             />
           </div>
@@ -92,6 +101,7 @@ const Home = () => {
               value={financialData.turnover} 
               onChange={handleInputChange}
               className="w-full p-2 border rounded"
+              placeholder="Enter turnover"
             />
           </div>
           <div>
@@ -102,6 +112,7 @@ const Home = () => {
               value={financialData.npbt} 
               onChange={handleInputChange}
               className="w-full p-2 border rounded"
+              placeholder="Enter NPBT"
             />
           </div>
           <div>
@@ -112,6 +123,7 @@ const Home = () => {
               value={financialData.npat} 
               onChange={handleInputChange}
               className="w-full p-2 border rounded"
+              placeholder="Enter NPAT"
             />
           </div>
           <div>
@@ -122,6 +134,7 @@ const Home = () => {
               value={financialData.salaries} 
               onChange={handleInputChange}
               className="w-full p-2 border rounded"
+              placeholder="Enter salaries"
             />
           </div>
           <div>
@@ -132,6 +145,7 @@ const Home = () => {
               value={financialData.wages} 
               onChange={handleInputChange}
               className="w-full p-2 border rounded"
+              placeholder="Enter wages"
             />
           </div>
           <div>
@@ -142,6 +156,7 @@ const Home = () => {
               value={financialData.directorsEmoluments} 
               onChange={handleInputChange}
               className="w-full p-2 border rounded"
+              placeholder="Enter directors emoluments"
             />
           </div>
           <div>
@@ -152,6 +167,7 @@ const Home = () => {
               value={financialData.annualPayroll} 
               onChange={handleInputChange}
               className="w-full p-2 border rounded"
+              placeholder="Enter annual payroll"
             />
           </div>
           <div>
@@ -162,6 +178,7 @@ const Home = () => {
               value={financialData.expenses} 
               onChange={handleInputChange}
               className="w-full p-2 border rounded"
+              placeholder="Enter expenses"
             />
           </div>
           <div>
@@ -172,6 +189,7 @@ const Home = () => {
               value={financialData.costOfSales} 
               onChange={handleInputChange}
               className="w-full p-2 border rounded"
+              placeholder="Enter cost of sales"
             />
           </div>
           <div>
@@ -182,6 +200,7 @@ const Home = () => {
               value={financialData.depreciation} 
               onChange={handleInputChange}
               className="w-full p-2 border rounded"
+              placeholder="Enter depreciation"
             />
           </div>
         </div>
@@ -199,6 +218,7 @@ const Home = () => {
               value={financialData.sdlPayments} 
               onChange={handleInputChange}
               className="w-full p-2 border rounded"
+              placeholder="Enter SDL payments"
             />
           </div>
           <div>
@@ -209,6 +229,7 @@ const Home = () => {
               value={financialData.totalLeviableAmount} 
               onChange={handleInputChange}
               className="w-full p-2 border rounded"
+              placeholder="Enter total leviable amount"
             />
           </div>
         </div>
@@ -225,6 +246,7 @@ const Home = () => {
             value={financialData.totalMeasuredProcurementSpend} 
             onChange={handleInputChange}
             className="w-full p-2 border rounded"
+            placeholder="Enter total procurement spend"
           />
         </div>
       </div>
@@ -251,9 +273,16 @@ const Home = () => {
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <h2 className="text-xl font-semibold mb-4">Management Control</h2>
         <div className="flex justify-between items-center">
-          <p>Add management details to calculate your B-BBEE management score</p>
-          <button className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
-            Add Management Details
+          <p>
+            {managementDetails?.managementData
+              ? `Management details added (Black Voting Rights: ${managementDetails.managementData.blackVotingRights}%)`
+              : "Add management details to calculate your B-BBEE management score"}
+          </p>
+          <button 
+            onClick={() => setShowManagementModal(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+          >
+            {managementDetails ? "Edit Management Details" : "Add Management Details"}
           </button>
         </div>
       </div>
@@ -296,6 +325,14 @@ const Home = () => {
         <OwnershipDetails
           onClose={() => setShowOwnershipModal(false)}
           onSubmit={handleOwnershipSubmit}
+        />
+      )}
+
+      {/* Management Modal */}
+      {showManagementModal && (
+        <ManagementControl
+          onClose={() => setShowManagementModal(false)}
+          onSubmit={handleManagementSubmit}
         />
       )}
 
