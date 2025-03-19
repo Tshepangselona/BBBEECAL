@@ -297,4 +297,101 @@ app.get("/employment-equity/:userId", async (req, res) => {
   }
 });
 
+// Yes 4 Youth Initiative - Create
+app.post("/yes4youth-initiative", async (req, res) => {
+  console.log("Yes 4 Youth Initiative POST hit with body:", req.body);
+  const { userId, participants, yesData } = req.body;
+
+  try {
+    if (!userId) {
+      console.log("Missing userId");
+      return res.status(400).json({ error: "User ID is required" });
+    }
+    if (!participants || !Array.isArray(participants)) {
+      console.log("Invalid participants data");
+      return res.status(400).json({ error: "Participants must be an array" });
+    }
+    if (!yesData || typeof yesData !== 'object') {
+      console.log("Invalid yesData");
+      return res.status(400).json({ error: "YES data must be an object" });
+    }
+
+    const userDoc = await getDoc(doc(db, "users", userId));
+    if (!userDoc.exists()) {
+      console.log("User not found for userId:", userId);
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const yes4YouthInitiativeData = {
+      userId,
+      participants: participants.map(participant => ({
+        name: participant.name || "",
+        siteLocation: participant.siteLocation || "",
+        idNumber: participant.idNumber || "",
+        jobTitle: participant.jobTitle || "",
+        race: participant.race || "",
+        gender: participant.gender || "",
+        occupationalLevel: participant.occupationalLevel || "",
+        hostEmployerYear: participant.hostEmployerYear || "",
+        monthlyStipend: Number(participant.monthlyStipend) || 0,
+        startDate: participant.startDate || "",
+        endDate: participant.endDate || "",
+        isCurrentYesEmployee: Boolean(participant.isCurrentYesEmployee),
+        isCompletedYesAbsorbed: Boolean(participant.isCompletedYesAbsorbed)
+      })),
+      yesData: {
+        totalParticipants: Number(yesData.totalParticipants) || 0,
+        blackYouthParticipants: Number(yesData.blackYouthParticipants) || 0,
+        totalStipendPaid: Number(yesData.totalStipendPaid) || 0,
+        currentYesEmployees: Number(yesData.currentYesEmployees) || 0,
+        completedYesAbsorbed: Number(yesData.completedYesAbsorbed) || 0
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    const docRef = await addDoc(collection(db, "yes4YouthInitiative"), yes4YouthInitiativeData);
+
+    res.status(201).json({
+      message: "YES 4 Youth Initiative data saved successfully",
+      id: docRef.id,
+      ...yes4YouthInitiativeData
+    });
+  } catch (error) {
+    console.error("Detailed error:", error);
+    res.status(400).json({ error: error.message, code: error.code });
+  }
+});
+
+// Yes 4 Youth Initiative - Retrieve
+app.get("/yes4youth-initiative/:userId", async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const yesRef = collection(db, "yes4YouthInitiative");
+    const q = query(yesRef, where("userId", "==", userId));
+    const querySnapshot = await getDocs(q);
+    
+    const yesRecords = [];
+    querySnapshot.forEach((doc) => {
+      yesRecords.push({
+        id: doc.id,
+        ...doc.data()
+      });
+    });
+
+    if (yesRecords.length === 0) {
+      return res.status(404).json({ message: "No YES 4 Youth Initiative data found for this user" });
+    }
+
+    res.status(200).json({
+      message: "YES 4 Youth Initiative data retrieved successfully",
+      data: yesRecords
+    });
+  } catch (error) {
+    console.error("YES 4 Youth Initiative retrieval error:", error.code, error.message);
+    res.status(500).json({ error: error.message, code: error.code });
+  }
+});
+
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

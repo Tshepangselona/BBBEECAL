@@ -513,7 +513,7 @@ const SkillsDevelopment = ({ onClose, onSubmit }) => {
               type="submit"
               className="bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-blue-700 w-full sm:w-auto transition-all duration-200"
             >
-              Save Ownership Details
+              Save Skills Development Details
             </button>
           </div>
         </form>
