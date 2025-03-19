@@ -422,6 +422,7 @@ const Home = () => {
       )}
       {showYesModal && (
         <Yes4YouthInitiative
+          userId={userId} // Pass userId here
           onClose={() => setShowYesModal(false)}
           onSubmit={handleYesSubmit}
         />

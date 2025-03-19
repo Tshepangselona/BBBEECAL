@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const Yes4YouthInitiative = ({ onClose, onSubmit }) => {
+const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => { // Added userId prop
   const occupationalLevels = [
     'Executive Management',
     'Other Executive Management',
@@ -58,7 +58,7 @@ const Yes4YouthInitiative = ({ onClose, onSubmit }) => {
       race: '',
       gender: '',
       occupationalLevel: '',
-hostEmployerYear: '',
+      hostEmployerYear: '',
       monthlyStipend: 0,
       startDate: '',
       endDate: '',
@@ -78,7 +78,7 @@ hostEmployerYear: '',
 
     updatedParticipants.forEach((participant) => {
       if (participant.race.toLowerCase() === 'black') {
-        blackYouthParticipants += 1; // Assuming YES focuses on black youth
+        blackYouthParticipants += 1;
       }
       totalStipendPaid += Number(participant.monthlyStipend);
       if (participant.isCurrentYesEmployee) {
@@ -98,10 +98,45 @@ hostEmployerYear: '',
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onSubmit({ participants, yesData });
-    onClose();
+    console.log('Submitting data:', { userId, participants, yesData });
+
+    if (!userId) {
+      console.log('User ID is missing!');
+      alert('User ID is missing. Please ensure you are logged in.');
+      return;
+    }
+
+    try {
+      const response = await fetch('http://localhost:5000/yes4youth-initiative', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
+          participants,
+          yesData,
+        }),
+      });
+
+      console.log('Response status:', response.status);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Error response:', errorData);
+        throw new Error(errorData.error || 'Failed to save YES initiative data');
+      }
+
+      const result = await response.json();
+      console.log('YES initiative data saved:', result);
+      onSubmit({ participants, yesData });
+      onClose();
+    } catch (error) {
+      console.error('Error submitting YES initiative:', error);
+      alert(`Failed to save YES initiative data: ${error.message}`);
+    }
   };
 
   return (
@@ -388,10 +423,9 @@ hostEmployerYear: '',
               type="submit"
               className="bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-blue-700 w-full sm:w-auto transition-all duration-200"
             >
-              Save Ownership Details
+              Save Youth Details
             </button>
           </div>
-
         </form>
       </div>
     </div>
