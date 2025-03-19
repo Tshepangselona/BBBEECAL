@@ -500,4 +500,135 @@ app.get("/skills-development/:userId", async (req, res) => {
   }
 });
 
+// Ownership Details - Create
+app.post("/ownership-details", async (req, res) => {
+  console.log("Ownership Details POST hit with body:", req.body);
+  const { userId, participants, entities, ownershipData } = req.body;
+
+  try {
+    if (!userId) {
+      console.log("Missing userId");
+      return res.status(400).json({ error: "User ID is required" });
+    }
+    if (!participants || !Array.isArray(participants)) {
+      console.log("Invalid participants data");
+      return res.status(400).json({ error: "Participants must be an array" });
+    }
+    if (!entities || !Array.isArray(entities)) {
+      console.log("Invalid entities data");
+      return res.status(400).json({ error: "Entities must be an array" });
+    }
+    if (!ownershipData || typeof ownershipData !== "object") {
+      console.log("Invalid ownershipData");
+      return res.status(400).json({ error: "Ownership data must be an object" });
+    }
+
+    const userDoc = await getDoc(doc(db, "users", userId));
+    if (!userDoc.exists()) {
+      console.log("User not found for userId:", userId);
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const ownershipDetailsData = {
+      userId,
+      participants: participants.map((participant) => ({
+        name: participant.name || "",
+        idNumber: participant.idNumber || "",
+        race: participant.race || "",
+        gender: participant.gender || "",
+        isForeign: Boolean(participant.isForeign),
+        isNewEntrant: Boolean(participant.isNewEntrant),
+        designatedGroups: Boolean(participant.designatedGroups),
+        isYouth: Boolean(participant.isYouth),
+        isDisabled: Boolean(participant.isDisabled),
+        isUnemployed: Boolean(participant.isUnemployed),
+        isLivingInRuralAreas: Boolean(participant.isLivingInRuralAreas),
+        isMilitaryVeteran: Boolean(participant.isMilitaryVeteran),
+        economicInterest: Number(participant.economicInterest) || 0,
+        votingRights: Number(participant.votingRights) || 0,
+        outstandingDebt: Number(participant.outstandingDebt) || 0,
+      })),
+      entities: entities.map((entity) => ({
+        tier: entity.tier || "",
+        entityName: entity.entityName || "",
+        ownershipInNextTier: Number(entity.ownershipInNextTier) || 0,
+        modifiedFlowThroughApplied: Boolean(entity.modifiedFlowThroughApplied),
+        totalBlackVotingRights: Number(entity.totalBlackVotingRights) || 0,
+        blackWomenVotingRights: Number(entity.blackWomenVotingRights) || 0,
+        totalBlackEconomicInterest: Number(entity.totalBlackEconomicInterest) || 0,
+        blackWomenEconomicInterest: Number(entity.blackWomenEconomicInterest) || 0,
+        newEntrants: Number(entity.newEntrants) || 0,
+        designatedGroups: Number(entity.designatedGroups) || 0,
+        youth: Number(entity.youth) || 0,
+        disabled: Number(entity.disabled) || 0,
+        unemployed: Number(entity.unemployed) || 0,
+        livingInRuralAreas: Number(entity.livingInRuralAreas) || 0,
+        militaryVeteran: Number(entity.militaryVeteran) || 0,
+        esopBbos: Number(entity.esopBbos) || 0,
+        coOps: Number(entity.coOps) || 0,
+        outstandingDebtByBlackParticipants: Number(entity.outstandingDebtByBlackParticipants) || 0,
+      })),
+      ownershipData: {
+        blackOwnershipPercentage: Number(ownershipData.blackOwnershipPercentage) || 0,
+        blackFemaleOwnershipPercentage: Number(ownershipData.blackFemaleOwnershipPercentage) || 0,
+        blackYouthOwnershipPercentage: Number(ownershipData.blackYouthOwnershipPercentage) || 0,
+        blackDisabledOwnershipPercentage: Number(ownershipData.blackDisabledOwnershipPercentage) || 0,
+        blackUnemployedOwnershipPercentage: Number(ownershipData.blackUnemployedOwnershipPercentage) || 0,
+        blackRuralOwnershipPercentage: Number(ownershipData.blackRuralOwnershipPercentage) || 0,
+        blackMilitaryVeteranOwnershipPercentage: Number(ownershipData.blackMilitaryVeteranOwnershipPercentage) || 0,
+        votingRightsBlack: Number(ownershipData.votingRightsBlack) || 0,
+        votingRightsBlackFemale: Number(ownershipData.votingRightsBlackFemale) || 0,
+        economicInterestBlack: Number(ownershipData.economicInterestBlack) || 0,
+        economicInterestBlackFemale: Number(ownershipData.economicInterestBlackFemale) || 0,
+        ownershipFulfillment: Boolean(ownershipData.ownershipFulfillment),
+        netValue: Number(ownershipData.netValue) || 0,
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const docRef = await addDoc(collection(db, "ownershipDetails"), ownershipDetailsData);
+
+    res.status(201).json({
+      message: "Ownership details data saved successfully",
+      id: docRef.id,
+      ...ownershipDetailsData,
+    });
+  } catch (error) {
+    console.error("Detailed error:", error);
+    res.status(400).json({ error: error.message, code: error.code });
+  }
+});
+
+// Ownership Details - Retrieve
+app.get("/ownership-details/:userId", async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const ownershipRef = collection(db, "ownershipDetails");
+    const q = query(ownershipRef, where("userId", "==", userId));
+    const querySnapshot = await getDocs(q);
+
+    const ownershipRecords = [];
+    querySnapshot.forEach((doc) => {
+      ownershipRecords.push({
+        id: doc.id,
+        ...doc.data(),
+      });
+    });
+
+    if (ownershipRecords.length === 0) {
+      return res.status(404).json({ message: "No ownership details data found for this user" });
+    }
+
+    res.status(200).json({
+      message: "Ownership details data retrieved successfully",
+      data: ownershipRecords,
+    });
+  } catch (error) {
+    console.error("Ownership details retrieval error:", error.code, error.message);
+    res.status(500).json({ error: error.message, code: error.code });
+  }
+});
+
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

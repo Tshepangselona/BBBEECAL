@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from "react";
+import axios from "axios"; // Ensure axios is installed: `npm install axios`
 
-const OwnershipDetails = ({ onClose, onSubmit }) => {
+const OwnershipDetails = ({ userId, onClose, onSubmit }) => {
   const [participants, setParticipants] = useState([]);
   const [newParticipant, setNewParticipant] = useState({
-    name: '',
-    idNumber: '',
-    race: '',
-    gender: '',
+    name: "",
+    idNumber: "",
+    race: "",
+    gender: "",
     isForeign: false,
     isNewEntrant: false,
     designatedGroups: false,
@@ -17,13 +18,13 @@ const OwnershipDetails = ({ onClose, onSubmit }) => {
     isMilitaryVeteran: false,
     economicInterest: 0,
     votingRights: 0,
-    outstandingDebt: 0
+    outstandingDebt: 0,
   });
 
   const [entities, setEntities] = useState([]);
   const [newEntity, setNewEntity] = useState({
-    tier: '',
-    entityName: '',
+    tier: "",
+    entityName: "",
     ownershipInNextTier: 0,
     modifiedFlowThroughApplied: false,
     totalBlackVotingRights: 0,
@@ -39,7 +40,7 @@ const OwnershipDetails = ({ onClose, onSubmit }) => {
     militaryVeteran: 0,
     esopBbos: 0,
     coOps: 0,
-    outstandingDebtByBlackParticipants: 0
+    outstandingDebtByBlackParticipants: 0,
   });
 
   const [ownershipData, setOwnershipData] = useState({
@@ -55,29 +56,47 @@ const OwnershipDetails = ({ onClose, onSubmit }) => {
     economicInterestBlack: 0,
     economicInterestBlackFemale: 0,
     ownershipFulfillment: false,
-    netValue: 0
+    netValue: 0,
   });
+
+  // Fetch existing data when component mounts (optional)
+  useEffect(() => {
+    const fetchOwnershipData = async () => {
+      try {
+        const response = await axios.get(`http://localhost:5000/ownership-details/${userId}`);
+        const records = response.data.data;
+        if (records.length > 0) {
+          setParticipants(records[0].participants); // Load the first record's participants
+          setEntities(records[0].entities); // Load the first record's entities
+          setOwnershipData(records[0].ownershipData); // Load the first record's ownershipData
+        }
+      } catch (error) {
+        console.error("Error fetching ownership details:", error);
+      }
+    };
+    if (userId) fetchOwnershipData();
+  }, [userId]);
 
   const handleParticipantChange = (e) => {
     const { name, value, type, checked } = e.target;
     setNewParticipant({
       ...newParticipant,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: type === "checkbox" ? checked : value,
     });
   };
 
   const addParticipant = () => {
     if (!newParticipant.name || !newParticipant.idNumber) {
-      alert('Please fill in the Name and ID Number.');
+      alert("Please fill in the Name and ID Number.");
       return;
     }
 
     setParticipants([...participants, newParticipant]);
     setNewParticipant({
-      name: '',
-      idNumber: '',
-      race: '',
-      gender: '',
+      name: "",
+      idNumber: "",
+      race: "",
+      gender: "",
       isForeign: false,
       isNewEntrant: false,
       designatedGroups: false,
@@ -88,7 +107,7 @@ const OwnershipDetails = ({ onClose, onSubmit }) => {
       isMilitaryVeteran: false,
       economicInterest: 0,
       votingRights: 0,
-      outstandingDebt: 0
+      outstandingDebt: 0,
     });
 
     recalculateOwnershipData([...participants, newParticipant]);
@@ -98,20 +117,39 @@ const OwnershipDetails = ({ onClose, onSubmit }) => {
     const { name, value, type, checked } = e.target;
     setNewEntity({
       ...newEntity,
-      [name]: type === 'checkbox' ? checked : Number(value)
+      [name]: type === "checkbox" ? checked : value, // Keep as string initially, convert to number in addEntity
     });
   };
 
   const addEntity = () => {
     if (!newEntity.entityName || !newEntity.tier) {
-      alert('Please fill in the Entity Name and Tier.');
+      alert("Please fill in the Entity Name and Tier.");
       return;
     }
 
-    setEntities([...entities, newEntity]);
+    const updatedEntity = {
+      ...newEntity,
+      ownershipInNextTier: Number(newEntity.ownershipInNextTier) || 0,
+      totalBlackVotingRights: Number(newEntity.totalBlackVotingRights) || 0,
+      blackWomenVotingRights: Number(newEntity.blackWomenVotingRights) || 0,
+      totalBlackEconomicInterest: Number(newEntity.totalBlackEconomicInterest) || 0,
+      blackWomenEconomicInterest: Number(newEntity.blackWomenEconomicInterest) || 0,
+      newEntrants: Number(newEntity.newEntrants) || 0,
+      designatedGroups: Number(newEntity.designatedGroups) || 0,
+      youth: Number(newEntity.youth) || 0,
+      disabled: Number(newEntity.disabled) || 0,
+      unemployed: Number(newEntity.unemployed) || 0,
+      livingInRuralAreas: Number(newEntity.livingInRuralAreas) || 0,
+      militaryVeteran: Number(newEntity.militaryVeteran) || 0,
+      esopBbos: Number(newEntity.esopBbos) || 0,
+      coOps: Number(newEntity.coOps) || 0,
+      outstandingDebtByBlackParticipants: Number(newEntity.outstandingDebtByBlackParticipants) || 0,
+    };
+
+    setEntities([...entities, updatedEntity]);
     setNewEntity({
-      tier: '',
-      entityName: '',
+      tier: "",
+      entityName: "",
       ownershipInNextTier: 0,
       modifiedFlowThroughApplied: false,
       totalBlackVotingRights: 0,
@@ -127,10 +165,10 @@ const OwnershipDetails = ({ onClose, onSubmit }) => {
       militaryVeteran: 0,
       esopBbos: 0,
       coOps: 0,
-      outstandingDebtByBlackParticipants: 0
+      outstandingDebtByBlackParticipants: 0,
     });
 
-    recalculateOwnershipDataFromEntities([...entities, newEntity]);
+    recalculateOwnershipDataFromEntities([...entities, updatedEntity]);
   };
 
   const recalculateOwnershipData = (updatedParticipants) => {
@@ -150,11 +188,11 @@ const OwnershipDetails = ({ onClose, onSubmit }) => {
       const economicInterest = Number(participant.economicInterest);
       const votingRights = Number(participant.votingRights);
 
-      if (participant.race.toLowerCase() === 'black') {
+      if (participant.race.toLowerCase() === "black") {
         economicInterestBlack += economicInterest;
         votingRightsBlack += votingRights;
 
-        if (participant.gender.toLowerCase() === 'female') {
+        if (participant.gender.toLowerCase() === "female") {
           economicInterestBlackFemale += economicInterest;
           votingRightsBlackFemale += votingRights;
           blackFemaleOwnershipPercentage += economicInterest;
@@ -182,7 +220,7 @@ const OwnershipDetails = ({ onClose, onSubmit }) => {
       votingRightsBlack,
       votingRightsBlackFemale,
       economicInterestBlack,
-      economicInterestBlackFemale
+      economicInterestBlackFemale,
     });
   };
 
@@ -226,7 +264,7 @@ const OwnershipDetails = ({ onClose, onSubmit }) => {
       votingRightsBlack,
       votingRightsBlackFemale,
       economicInterestBlack,
-      economicInterestBlackFemale
+      economicInterestBlackFemale,
     });
   };
 
@@ -234,14 +272,22 @@ const OwnershipDetails = ({ onClose, onSubmit }) => {
     const { name, value, type, checked } = e.target;
     setOwnershipData({
       ...ownershipData,
-      [name]: type === 'checkbox' ? checked : Number(value)
+      [name]: type === "checkbox" ? checked : Number(value),
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onSubmit({ participants, entities, ownershipData });
-    onClose();
+    try {
+      const payload = { userId, participants, entities, ownershipData };
+      const response = await axios.post("http://localhost:5000/ownership-details", payload);
+      console.log("Ownership details data saved:", response.data);
+      onSubmit(payload); // Optional: Pass data to parent component
+      onClose();
+    } catch (error) {
+      console.error("Error saving ownership details:", error.message, error.response?.data);
+      alert(`Failed to save ownership details: ${error.message}`);
+    }
   };
 
   return (
@@ -461,14 +507,14 @@ const OwnershipDetails = ({ onClose, onSubmit }) => {
                         <td className="border border-gray-300 px-4 py-2">{participant.idNumber}</td>
                         <td className="border border-gray-300 px-4 py-2">{participant.race}</td>
                         <td className="border border-gray-300 px-4 py-2">{participant.gender}</td>
-                        <td className="border border-gray-300 px-4 py-2">{participant.isForeign ? 'Yes' : 'No'}</td>
-                        <td className="border border-gray-300 px-4 py-2">{participant.isNewEntrant ? 'Yes' : 'No'}</td>
-                        <td className="border border-gray-300 px-4 py-2">{participant.designatedGroups ? 'Yes' : 'No'}</td>
-                        <td className="border border-gray-300 px-4 py-2">{participant.isYouth ? 'Yes' : 'No'}</td>
-                        <td className="border border-gray-300 px-4 py-2">{participant.isDisabled ? 'Yes' : 'No'}</td>
-                        <td className="border border-gray-300 px-4 py-2">{participant.isUnemployed ? 'Yes' : 'No'}</td>
-                        <td className="border border-gray-300 px-4 py-2">{participant.isLivingInRuralAreas ? 'Yes' : 'No'}</td>
-                        <td className="border border-gray-300 px-4 py-2">{participant.isMilitaryVeteran ? 'Yes' : 'No'}</td>
+                        <td className="border border-gray-300 px-4 py-2">{participant.isForeign ? "Yes" : "No"}</td>
+                        <td className="border border-gray-300 px-4 py-2">{participant.isNewEntrant ? "Yes" : "No"}</td>
+                        <td className="border border-gray-300 px-4 py-2">{participant.designatedGroups ? "Yes" : "No"}</td>
+                        <td className="border border-gray-300 px-4 py-2">{participant.isYouth ? "Yes" : "No"}</td>
+                        <td className="border border-gray-300 px-4 py-2">{participant.isDisabled ? "Yes" : "No"}</td>
+                        <td className="border border-gray-300 px-4 py-2">{participant.isUnemployed ? "Yes" : "No"}</td>
+                        <td className="border border-gray-300 px-4 py-2">{participant.isLivingInRuralAreas ? "Yes" : "No"}</td>
+                        <td className="border border-gray-300 px-4 py-2">{participant.isMilitaryVeteran ? "Yes" : "No"}</td>
                         <td className="border border-gray-300 px-4 py-2">{participant.economicInterest}</td>
                         <td className="border border-gray-300 px-4 py-2">{participant.votingRights}</td>
                         <td className="border border-gray-300 px-4 py-2">{participant.outstandingDebt}</td>
@@ -737,7 +783,7 @@ const OwnershipDetails = ({ onClose, onSubmit }) => {
                         <td className="border border-gray-300 px-4 py-2">{entity.tier}</td>
                         <td className="border border-gray-300 px-4 py-2">{entity.entityName}</td>
                         <td className="border border-gray-300 px-4 py-2">{entity.ownershipInNextTier}</td>
-                        <td className="border border-gray-300 px-4 py-2">{entity.modifiedFlowThroughApplied ? 'Yes' : 'No'}</td>
+                        <td className="border border-gray-300 px-4 py-2">{entity.modifiedFlowThroughApplied ? "Yes" : "No"}</td>
                         <td className="border border-gray-300 px-4 py-2">{entity.totalBlackVotingRights}</td>
                         <td className="border border-gray-300 px-4 py-2">{entity.blackWomenVotingRights}</td>
                         <td className="border border-gray-300 px-4 py-2">{entity.totalBlackEconomicInterest}</td>
