@@ -111,7 +111,7 @@ app.get('/test', (req, res) => {
   res.status(200).json({ message: 'Test route working' });
 });
 
-// Management Control - Create
+// Management Control Table- creating the table
 app.post("/management-control", async (req, res) => {
   console.log("Management control POST hit with body:", req.body);
   const { userId, managers, managementData } = req.body;
@@ -200,5 +200,9 @@ app.get("/management-control/:userId", async (req, res) => {  const { userId } =
     res.status(500).json({ error: error.message, code: error.code });
   }
 });
+
+//Employment Equity Details-creating the table
+app.post("/")
+
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

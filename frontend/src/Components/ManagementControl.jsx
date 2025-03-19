@@ -376,17 +376,17 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
             </div>
           </div>
 
-          <div className="fixed bottom-20 right-4 flex justify-end gap-4 bg-white p-4 rounded-md shadow-lg">
+          <div className="fixed bottom-4 sm:bottom-12 right-2 sm:right-4 md:right-78 flex flex-col sm:flex-row justify-end gap-2 sm:gap-4 bg-white p-3 sm:p-4 rounded-md shadow-lg w-[90%] sm:w-auto max-w-md">
             <button
               type="button"
               onClick={onClose}
-              className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300"
+              className="bg-gray-200 text-gray-800 px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-gray-300 w-full sm:w-auto transition-all duration-200"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+              className="bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-blue-700 w-full sm:w-auto transition-all duration-200"
             >
               Save Ownership Details
             </button>
