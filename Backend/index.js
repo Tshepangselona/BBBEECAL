@@ -394,4 +394,110 @@ app.get("/yes4youth-initiative/:userId", async (req, res) => {
   }
 });
 
+// Skills Development - Create
+app.post("/skills-development", async (req, res) => {
+  console.log("Skills Development POST hit with body:", req.body);
+  const { userId, trainings, summary } = req.body;
+
+  try {
+    if (!userId) {
+      console.log("Missing userId");
+      return res.status(400).json({ error: "User ID is required" });
+    }
+    if (!trainings || !Array.isArray(trainings)) {
+      console.log("Invalid trainings data");
+      return res.status(400).json({ error: "Trainings must be an array" });
+    }
+    if (!summary || typeof summary !== "object") {
+      console.log("Invalid summary data");
+      return res.status(400).json({ error: "Summary must be an object" });
+    }
+
+    const userDoc = await getDoc(doc(db, "users", userId));
+    if (!userDoc.exists()) {
+      console.log("User not found for userId:", userId);
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const skillsDevelopmentData = {
+      userId,
+      trainings: trainings.map((training) => ({
+        startDate: training.startDate || "",
+        endDate: training.endDate || "",
+        trainingCourse: training.trainingCourse || "",
+        trainerProvider: training.trainerProvider || "",
+        category: training.category || "",
+        learnerName: training.learnerName || "",
+        siteLocation: training.siteLocation || "",
+        idNumber: training.idNumber || "",
+        race: training.race || "",
+        gender: training.gender || "",
+        isDisabled: Boolean(training.isDisabled),
+        coreCriticalSkills: training.coreCriticalSkills || "",
+        totalDirectExpenditure: Number(training.totalDirectExpenditure) || 0,
+        additionalExpenditure: Number(training.additionalExpenditure) || 0,
+        costToCompanySalary: Number(training.costToCompanySalary) || 0,
+        trainingDurationHours: Number(training.trainingDurationHours) || 0,
+        numberOfParticipants: Number(training.numberOfParticipants) || 0,
+        isUnemployedLearner: Boolean(training.isUnemployedLearner),
+        isAbsorbedInternalTrainer: Boolean(training.isAbsorbedInternalTrainer),
+      })),
+      summary: {
+        totalTrainings: Number(summary.totalTrainings) || 0,
+        totalDirectExpenditure: Number(summary.totalDirectExpenditure) || 0,
+        totalAdditionalExpenditure: Number(summary.totalAdditionalExpenditure) || 0,
+        totalCostToCompanySalary: Number(summary.totalCostToCompanySalary) || 0,
+        totalTrainingHours: Number(summary.totalTrainingHours) || 0,
+        totalParticipants: Number(summary.totalParticipants) || 0,
+        unemployedLearners: Number(summary.unemployedLearners) || 0,
+        absorbedInternalTrainers: Number(summary.absorbedInternalTrainers) || 0,
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const docRef = await addDoc(collection(db, "skillsDevelopment"), skillsDevelopmentData);
+
+    res.status(201).json({
+      message: "Skills development data saved successfully",
+      id: docRef.id,
+      ...skillsDevelopmentData,
+    });
+  } catch (error) {
+    console.error("Detailed error:", error);
+    res.status(400).json({ error: error.message, code: error.code });
+  }
+});
+
+// Skills Development - Retrieve
+app.get("/skills-development/:userId", async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const skillsRef = collection(db, "skillsDevelopment");
+    const q = query(skillsRef, where("userId", "==", userId));
+    const querySnapshot = await getDocs(q);
+
+    const skillsRecords = [];
+    querySnapshot.forEach((doc) => {
+      skillsRecords.push({
+        id: doc.id,
+        ...doc.data(),
+      });
+    });
+
+    if (skillsRecords.length === 0) {
+      return res.status(404).json({ message: "No skills development data found for this user" });
+    }
+
+    res.status(200).json({
+      message: "Skills development data retrieved successfully",
+      data: skillsRecords,
+    });
+  } catch (error) {
+    console.error("Skills development retrieval error:", error.code, error.message);
+    res.status(500).json({ error: error.message, code: error.code });
+  }
+});
+
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
