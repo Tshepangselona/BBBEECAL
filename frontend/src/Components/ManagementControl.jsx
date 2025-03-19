@@ -376,7 +376,7 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
             </div>
           </div>
 
-          <div className="flex justify-end gap-4">
+          <div className="fixed bottom-20 right-4 flex justify-end gap-4 bg-white p-4 rounded-md shadow-lg">
             <button
               type="button"
               onClick={onClose}
@@ -388,7 +388,7 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
               type="submit"
               className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
             >
-              Save Management Details
+              Save Ownership Details
             </button>
           </div>
         </form>
