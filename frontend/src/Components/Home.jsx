@@ -413,8 +413,9 @@ const Home = () => {
           onSubmit={handleManagementSubmit}
         />
       )}
-      {showEmploymentModal && (
+      {showEmploymentModal && ( // Add this here
         <EmploymentEquity
+          userId={userId}
           onClose={() => setShowEmploymentModal(false)}
           onSubmit={handleEmploymentSubmit}
         />

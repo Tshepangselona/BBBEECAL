@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const EmploymentEquity = ({ onClose, onSubmit }) => {
+const EmploymentEquity = ({ userId, onClose, onSubmit }) => { // Added userId prop
   const occupationalLevels = [
     'Executive Management',
     'Other Executive Management',
@@ -81,7 +81,6 @@ const EmploymentEquity = ({ onClose, onSubmit }) => {
     let disabledEmployees = 0;
     let foreignEmployees = 0;
 
-    // Initialize breakdown by occupational level
     const byOccupationalLevel = occupationalLevels.reduce((acc, level) => {
       acc[level] = {
         total: 0,
@@ -94,29 +93,22 @@ const EmploymentEquity = ({ onClose, onSubmit }) => {
 
     updatedEmployees.forEach((employee) => {
       const level = employee.occupationalLevel;
-
-      // Increment total for the occupational level
       byOccupationalLevel[level].total += 1;
 
-      // Check for black employees
       if (employee.race.toLowerCase() === 'black') {
         blackEmployees += 1;
         byOccupationalLevel[level].black += 1;
-
-        // Check for black female employees
         if (employee.gender.toLowerCase() === 'female') {
           blackFemaleEmployees += 1;
           byOccupationalLevel[level].blackFemale += 1;
         }
       }
 
-      // Check for disabled employees
       if (employee.isDisabled) {
         disabledEmployees += 1;
         byOccupationalLevel[level].disabled += 1;
       }
 
-      // Check for foreign employees
       if (employee.isForeign) {
         foreignEmployees += 1;
       }
@@ -132,10 +124,45 @@ const EmploymentEquity = ({ onClose, onSubmit }) => {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onSubmit({ employees, employmentData });
-    onClose();
+    console.log('Submitting data:', { userId, employees, employmentData });
+
+    if (!userId) {
+      console.log('User ID is missing!');
+      alert('User ID is missing. Please ensure you are logged in.');
+      return;
+    }
+
+    try {
+      const response = await fetch('http://localhost:5000/employment-equity', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId, // Include userId here
+          employees,
+          employmentData,
+        }),
+      });
+
+      console.log('Response status:', response.status);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Error response:', errorData);
+        throw new Error(errorData.error || 'Failed to save employment equity data');
+      }
+
+      const result = await response.json();
+      console.log('Employment equity data saved:', result);
+      onSubmit({ employees, employmentData });
+      onClose();
+    } catch (error) {
+      console.error('Error submitting employment equity:', error);
+      alert(`Failed to save employment equity data: ${error.message}`);
+    }
   };
 
   return (
@@ -426,7 +453,7 @@ const EmploymentEquity = ({ onClose, onSubmit }) => {
               type="submit"
               className="bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-blue-700 w-full sm:w-auto transition-all duration-200"
             >
-              Save Ownership Details
+              Save Employment Equity Details 
             </button>
           </div>
         </form>
