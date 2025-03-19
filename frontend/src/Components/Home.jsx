@@ -430,6 +430,7 @@ const Home = () => {
 
 {showSkillsDevelopmentModal && (
       <SkillsDevelopment
+      userId={userId} // Pass userId here
         onClose={() => setShowSkillsDevelopmentModal(false)}
         onSubmit={handleSkillsDevelopmentSubmit}
       />
