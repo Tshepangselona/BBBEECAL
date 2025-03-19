@@ -5,6 +5,9 @@ import ManagementControl from './ManagementControl';
 import EmploymentEquity from './EmploymentEquity';
 import Yes4YouthInitiative from './Yes4YouthInitiative';
 import SkillsDevelopment  from "./SkillsDevelopment";
+import SupplierDevelopment from "./SupplierDevelopment";
+import EnterpriseDevelopment from './EnterpriseDevelopment';
+import SocioEconomicDevelopment from "./SocioEconomicDevelopment";
 
 const Home = () => {
   const location = useLocation();
@@ -34,11 +37,17 @@ const Home = () => {
   const [showEmploymentModal, setShowEmploymentModal] = useState(false);
   const [showYesModal, setShowYesModal] = useState(false);
   const [showSkillsDevelopmentModal, setShowSkillsDevelopmentModal] = useState(false);
+  const [showSupplierDevelopmentModal, setShowSupplierDevelopmentModal] = useState(false);
+  const [showEnterpriseDevelopmentModal, setShowEnterpriseDevelopmentModal] = useState(false);
+  const [showSocioEconomicDevelopmentModal, setShowSocioEconomicDevelopmentModal] = useState(false);
   const [ownershipDetails, setOwnershipDetails] = useState(null);
   const [managementDetails, setManagementDetails] = useState(null);
   const [employmentDetails, setEmploymentDetails] = useState(null);
   const [yesDetails, setYesDetails] = useState(null);
   const [skillsDevelopmentDetails, setSkillsDevelopmentDetails] = useState(null);
+  const [supplierDevelopmentDetails, setSupplierDevelopmentDetails] = useState(null);
+  const [enterpriseDevelopmentDetails, setEnterpriseDevelopmentDetails] = useState(null);
+  const [socioEconomicDevelopmentDetails, setSocioEconomicDevelopmentDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -141,6 +150,18 @@ const Home = () => {
   const handleSkillsDevelopmentSubmit = (data) => {
     setSkillsDevelopmentDetails(data);
     setShowSkillsDevelopmentModal(false);
+  };
+  const handleSupplierDevelopmentSubmit = (data) => {
+    setSupplierDevelopmentDetails(data);
+    setShowSupplierDevelopmentModal(false);
+  };
+  const handleEnterpriseDevelopmentSubmit = (data) => {
+    setEnterpriseDevelopmentDetails(data);
+    setShowEnterpriseDevelopmentModal(false);
+  };
+  const handleSocioEconomicDevelopmentSubmit = (data) => {
+    setSocioEconomicDevelopmentDetails(data);
+    setShowSocioEconomicDevelopmentModal(false);
   };
 
   if (loading) {
@@ -377,13 +398,38 @@ const Home = () => {
       </div>
     </div>
 
-      {/* Enterprise & Supplier Development */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <h2 className="text-xl font-semibold mb-4">Enterprise & Supplier Development</h2>
+    {/* Supplier Development & Imports */}
+    <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 className="text-xl font-semibold mb-4">Supplier Development & Imports</h2>
         <div className="flex justify-between items-center">
-          <p>Add enterprise & supplier development details to calculate your B-BBEE ESD score</p>
-          <button className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
-            Add ESD Details
+          <p>
+            {supplierDevelopmentDetails?.localSummary
+              ? `Supplier development details added (Total Suppliers: ${supplierDevelopmentDetails.localSummary.totalSuppliers}, Total Imports: ${supplierDevelopmentDetails.importSummary.totalImports})`
+              : "Add supplier development and imports details to calculate your B-BBEE supplier development score"}
+          </p>
+          <button
+            onClick={() => setShowSupplierDevelopmentModal(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+          >
+            {supplierDevelopmentDetails ? "Edit Supplier Development & Imports" : "Add Supplier Development & Imports"}
+          </button>
+        </div>
+      </div>
+
+      {/* Enterprise Development */}
+      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 className="text-xl font-semibold mb-4">Enterprise Development</h2>
+        <div className="flex justify-between items-center">
+          <p>
+            {enterpriseDevelopmentDetails?.summary
+              ? `Enterprise development details added (Total Beneficiaries: ${enterpriseDevelopmentDetails.summary.totalBeneficiaries})`
+              : "Add enterprise development details to calculate your B-BBEE enterprise development score"}
+          </p>
+          <button
+            onClick={() => setShowEnterpriseDevelopmentModal(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+          >
+            {enterpriseDevelopmentDetails ? "Edit Enterprise Development Details" : "Add Enterprise Development Details"}
           </button>
         </div>
       </div>
@@ -392,9 +438,16 @@ const Home = () => {
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <h2 className="text-xl font-semibold mb-4">Socio-Economic Development</h2>
         <div className="flex justify-between items-center">
-          <p>Add socio-economic development details to calculate your B-BBEE SED score</p>
-          <button className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
-            Add SED Details
+          <p>
+            {socioEconomicDevelopmentDetails?.summary
+              ? `Socio-economic development details added (Total Beneficiaries: ${socioEconomicDevelopmentDetails.summary.totalBeneficiaries})`
+              : "Add socio-economic development details to calculate your B-BBEE SED score"}
+          </p>
+          <button
+            onClick={() => setShowSocioEconomicDevelopmentModal(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+          >
+            {socioEconomicDevelopmentDetails ? "Edit SED Details" : "Add SED Details"}
           </button>
         </div>
       </div>
@@ -414,7 +467,7 @@ const Home = () => {
           onSubmit={handleManagementSubmit}
         />
       )}
-      {showEmploymentModal && ( // Add this here
+      {showEmploymentModal && ( 
         <EmploymentEquity
           userId={userId}
           onClose={() => setShowEmploymentModal(false)}
@@ -428,22 +481,40 @@ const Home = () => {
           onSubmit={handleYesSubmit}
         />
       )}
+      {showSkillsDevelopmentModal && (
+        <SkillsDevelopment
+          onClose={() => setShowSkillsDevelopmentModal(false)}
+          onSubmit={handleSkillsDevelopmentSubmit}
+        />
+      )}
+      {showSupplierDevelopmentModal && (
+        <SupplierDevelopment
+          onClose={() => setShowSupplierDevelopmentModal(false)}
+          onSubmit={handleSupplierDevelopmentSubmit}
+        />
+      )}
 
-{showSkillsDevelopmentModal && (
-      <SkillsDevelopment
-      userId={userId} // Pass userId here
-        onClose={() => setShowSkillsDevelopmentModal(false)}
-        onSubmit={handleSkillsDevelopmentSubmit}
-      />
-    )} {/* New modal for Skills Development */}
+{showEnterpriseDevelopmentModal && (
+        <EnterpriseDevelopment
+          onClose={() => setShowEnterpriseDevelopmentModal(false)}
+          onSubmit={handleEnterpriseDevelopmentSubmit}
+        />
+      )}
+      
+      {showSocioEconomicDevelopmentModal && (
+        <SocioEconomicDevelopment
+          onClose={() => setShowSocioEconomicDevelopmentModal(false)}
+          onSubmit={handleSocioEconomicDevelopmentSubmit}
+        />
+      )}
 
-    {/* Submit Button */}
-    <div className="flex justify-center mt-6">
-      <button className="bg-green-600 text-white px-8 py-3 rounded-md hover:bg-green-700 font-bold text-lg">
-        Calculate B-BBEE Score
-      </button>
+      {/* Submit Button */}
+      <div className="flex justify-center mt-6">
+        <button className="bg-green-600 text-white px-8 py-3 rounded-md hover:bg-green-700 font-bold text-lg">
+          Calculate B-BBEE Score
+        </button>
+      </div>
     </div>
-  </div>
   );
 };
 
