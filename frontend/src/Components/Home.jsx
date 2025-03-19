@@ -402,6 +402,7 @@ const Home = () => {
       {/* Modals */}
       {showOwnershipModal && (
         <OwnershipDetails
+          userId={userId}
           onClose={() => setShowOwnershipModal(false)}
           onSubmit={handleOwnershipSubmit}
         />
