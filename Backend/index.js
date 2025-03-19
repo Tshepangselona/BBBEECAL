@@ -201,8 +201,100 @@ app.get("/management-control/:userId", async (req, res) => {  const { userId } =
   }
 });
 
-//Employment Equity Details-creating the table
-app.post("/")
+// Employment Equity - Create
+app.post("/employment-equity", async (req, res) => {
+  console.log("Employment equity POST hit with body:", req.body);
+  const { userId, employees, employmentData } = req.body;
 
+  try {
+    if (!userId) {
+      console.log("Missing userId");
+      return res.status(400).json({ error: "User ID is required" });
+    }
+    if (!employees || !Array.isArray(employees)) {
+      console.log("Invalid employees data");
+      return res.status(400).json({ error: "Employees must be an array" });
+    }
+    if (!employmentData || typeof employmentData !== 'object') {
+      console.log("Invalid employmentData");
+      return res.status(400).json({ error: "Employment data must be an object" });
+    }
+
+    const userDoc = await getDoc(doc(db, "users", userId));
+    if (!userDoc.exists()) {
+      console.log("User not found for userId:", userId);
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const employmentEquityData = {
+      userId,
+      employees: employees.map(employee => ({
+        name: employee.name || "",
+        siteLocation: employee.siteLocation || "",
+        idNumber: employee.idNumber || "",
+        jobTitle: employee.jobTitle || "",
+        race: employee.race || "",
+        gender: employee.gender || "",
+        isDisabled: Boolean(employee.isDisabled),
+        descriptionOfDisability: employee.descriptionOfDisability || "",
+        isForeign: Boolean(employee.isForeign),
+        occupationalLevel: employee.occupationalLevel || "",
+        grossMonthlySalary: Number(employee.grossMonthlySalary) || 0
+      })),
+      employmentData: {
+        totalEmployees: Number(employmentData.totalEmployees) || 0,
+        blackEmployees: Number(employmentData.blackEmployees) || 0,
+        blackFemaleEmployees: Number(employmentData.blackFemaleEmployees) || 0,
+        disabledEmployees: Number(employmentData.disabledEmployees) || 0,
+        foreignEmployees: Number(employmentData.foreignEmployees) || 0,
+        byOccupationalLevel: employmentData.byOccupationalLevel || {}
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    const docRef = await addDoc(collection(db, "employmentEquity"), employmentEquityData);
+
+    res.status(201).json({
+      message: "Employment equity data saved successfully",
+      id: docRef.id,
+      ...employmentEquityData
+    });
+  } catch (error) {
+    console.error("Detailed error:", error);
+    res.status(400).json({ error: error.message, code: error.code });
+  }
+});
+
+// Employment Equity - Retrieve
+app.get("/employment-equity/:userId", async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const employmentRef = collection(db, "employmentEquity");
+    const q = query(employmentRef, where("userId", "==", userId));
+    const querySnapshot = await getDocs(q);
+    
+    const employmentRecords = [];
+    querySnapshot.forEach((doc) => {
+      employmentRecords.push({
+        id: doc.id,
+        ...doc.data()
+      });
+    });
+
+    if (employmentRecords.length === 0) {
+      return res.status(404).json({ message: "No employment equity data found for this user" });
+    }
+
+    res.status(200).json({
+      message: "Employment equity data retrieved successfully",
+      data: employmentRecords
+    });
+  } catch (error) {
+    console.error("Employment equity retrieval error:", error.code, error.message);
+    res.status(500).json({ error: error.message, code: error.code });
+  }
+});
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
