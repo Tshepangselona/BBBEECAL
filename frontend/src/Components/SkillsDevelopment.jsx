@@ -1,32 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from "react";
+import axios from "axios"; // You'll need to install axios: `npm install axios`
 
-const SkillsDevelopment = ({ onClose, onSubmit }) => {
-  // Define categories based on the provided image
+const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
   const categories = [
-    { value: 'A', label: 'Bursaries: Institution-based, theoretical only, formally assessed (incl. Basic Education)' },
-    { value: 'A2', label: 'Institution-based, theoretical instruction alone – formally assessed by educational institutions established by or registered with the Department of Higher Education & Training' },
-    { value: 'B', label: 'Internships: Institution-based, theoretical & practical learning, formally assessed' },
-    { value: 'C', label: 'Learnerships: Recognised or registered structured experiential learning in the workplace that is required after achievement of qualification, formally assessed' },
-    { value: 'D', label: 'Learnerships or Apprenticeships: Occupationally directed instructional & workplace learning programme (formal contract), formally assessed' },
-    { value: 'E', label: 'Work-integrated Learning: Occupationally directed instructional & workplace learning programme (no formal contract required), formally assessed' },
-    { value: 'F', label: 'Informal Training: Occupationally-directed informal instructional programmes. (Institutions, conferences, meetings)' },
-    { value: 'G', label: 'Informal Training | Work-based informal programmes (workplace)' },
+    { value: "A", label: "Bursaries: Institution-based, theoretical only, formally assessed (incl. Basic Education)" },
+    { value: "A2", label: "Institution-based, theoretical instruction alone – formally assessed by educational institutions established by or registered with the Department of Higher Education & Training" },
+    { value: "B", label: "Internships: Institution-based, theoretical & practical learning, formally assessed" },
+    { value: "C", label: "Learnerships: Recognised or registered structured experiential learning in the workplace that is required after achievement of qualification, formally assessed" },
+    { value: "D", label: "Learnerships or Apprenticeships: Occupationally directed instructional & workplace learning programme (formal contract), formally assessed" },
+    { value: "E", label: "Work-integrated Learning: Occupationally directed instructional & workplace learning programme (no formal contract required), formally assessed" },
+    { value: "F", label: "Informal Training: Occupationally-directed informal instructional programmes. (Institutions, conferences, meetings)" },
+    { value: "G", label: "Informal Training | Work-based informal programmes (workplace)" },
   ];
 
   const [trainings, setTrainings] = useState([]);
   const [newTraining, setNewTraining] = useState({
-    startDate: '',
-    endDate: '',
-    trainingCourse: '',
-    trainerProvider: '',
-    category: '',
-    learnerName: '',
-    siteLocation: '',
-    idNumber: '',
-    race: '',
-    gender: '',
+    startDate: "",
+    endDate: "",
+    trainingCourse: "",
+    trainerProvider: "",
+    category: "",
+    learnerName: "",
+    siteLocation: "",
+    idNumber: "",
+    race: "",
+    gender: "",
     isDisabled: false,
-    coreCriticalSkills: '',
+    coreCriticalSkills: "",
     totalDirectExpenditure: 0,
     additionalExpenditure: 0,
     costToCompanySalary: 0,
@@ -47,34 +47,51 @@ const SkillsDevelopment = ({ onClose, onSubmit }) => {
     absorbedInternalTrainers: 0,
   });
 
+  // Fetch existing data when component mounts (optional)
+  useEffect(() => {
+    const fetchSkillsData = async () => {
+      try {
+        const response = await axios.get(`http://localhost:5000/skills-development/${userId}`);
+        const records = response.data.data;
+        if (records.length > 0) {
+          setTrainings(records[0].trainings); // Assuming you want the first record's trainings
+          setSummary(records[0].summary);
+        }
+      } catch (error) {
+        console.error("Error fetching skills development data:", error);
+      }
+    };
+    if (userId) fetchSkillsData();
+  }, [userId]);
+
   const handleTrainingChange = (e) => {
     const { name, value, type, checked } = e.target;
     setNewTraining({
       ...newTraining,
-      [name]: type === 'checkbox' ? checked : value,
+      [name]: type === "checkbox" ? checked : value,
     });
   };
 
   const addTraining = () => {
     if (!newTraining.startDate || !newTraining.trainingCourse || !newTraining.learnerName || !newTraining.idNumber || !newTraining.category) {
-      alert('Please fill in the Start Date, Training Course, Learner Name, ID Number, and Category.');
+      alert("Please fill in the Start Date, Training Course, Learner Name, ID Number, and Category.");
       return;
     }
 
     setTrainings([...trainings, newTraining]);
     setNewTraining({
-      startDate: '',
-      endDate: '',
-      trainingCourse: '',
-      trainerProvider: '',
-      category: '',
-      learnerName: '',
-      siteLocation: '',
-      idNumber: '',
-      race: '',
-      gender: '',
+      startDate: "",
+      endDate: "",
+      trainingCourse: "",
+      trainerProvider: "",
+      category: "",
+      learnerName: "",
+      siteLocation: "",
+      idNumber: "",
+      race: "",
+      gender: "",
       isDisabled: false,
-      coreCriticalSkills: '',
+      coreCriticalSkills: "",
       totalDirectExpenditure: 0,
       additionalExpenditure: 0,
       costToCompanySalary: 0,
@@ -119,12 +136,20 @@ const SkillsDevelopment = ({ onClose, onSubmit }) => {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onSubmit({ trainings, summary });
-    onClose();
+    try {
+      const payload = { userId, trainings, summary };
+      const response = await axios.post("http://localhost:5000/skills-development", payload);
+      console.log("Skills development data saved:", response.data);
+      onSubmit(payload); // Optional: Pass data to parent component
+      onClose();
+    } catch (error) {
+      console.error("Error saving skills development data:", error);
+      alert("Failed to save skills development data. Please try again.");
+    }
   };
-
+    
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-md p-6 w-full max-w-5xl max-h-[80vh] overflow-y-auto">
