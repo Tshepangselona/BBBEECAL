@@ -1,14 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from "react";
 
-const SocioEconomicDevelopment = ({ onClose, onSubmit }) => {
+const SocioEconomicDevelopment = ({ userId, onClose, onSubmit }) => {
   const [beneficiaries, setBeneficiaries] = useState([]);
   const [newBeneficiary, setNewBeneficiary] = useState({
-    beneficiaryName: '',
-    siteLocation: '',
+    beneficiaryName: "",
+    siteLocation: "",
     blackParticipationPercentage: 0,
-    contributionType: '',
-    contributionDescription: '',
-    dateOfContribution: '',
+    contributionType: "",
+    contributionDescription: "",
+    dateOfContribution: "",
     contributionAmount: 0,
   });
 
@@ -18,32 +18,55 @@ const SocioEconomicDevelopment = ({ onClose, onSubmit }) => {
     averageBlackParticipation: 0,
   });
 
+  // Fetch existing data when component mounts
+  useEffect(() => {
+    const fetchSocioEconomicData = async () => {
+      try {
+        const response = await fetch(`http://localhost:5000/socio-economic-development/${userId}`);
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+        const { data } = await response.json();
+        if (data.length > 0) {
+          setBeneficiaries(data[0].beneficiaries);
+          setSummary(data[0].summary);
+        }
+      } catch (error) {
+        console.error("Error fetching socio-economic development data:", error);
+      }
+    };
+    if (userId) fetchSocioEconomicData();
+  }, [userId]);
+
   const handleBeneficiaryChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type } = e.target;
     setNewBeneficiary({
       ...newBeneficiary,
-      [name]: value,
+      [name]: type === "number" ? (value === "" ? 0 : Number(value)) : value,
     });
   };
 
   const addBeneficiary = () => {
-    if (!newBeneficiary.beneficiaryName || !newBeneficiary.contributionAmount || !newBeneficiary.contributionType) {
-      alert('Please fill in the Beneficiary Name, Contribution Amount, and Contribution Type.');
+    if (
+      !newBeneficiary.beneficiaryName ||
+      !newBeneficiary.contributionAmount ||
+      !newBeneficiary.contributionType
+    ) {
+      alert("Please fill in the Beneficiary Name, Contribution Amount, and Contribution Type.");
       return;
     }
 
-    setBeneficiaries([...beneficiaries, newBeneficiary]);
+    const updatedBeneficiaries = [...beneficiaries, newBeneficiary];
+    setBeneficiaries(updatedBeneficiaries);
     setNewBeneficiary({
-      beneficiaryName: '',
-      siteLocation: '',
+      beneficiaryName: "",
+      siteLocation: "",
       blackParticipationPercentage: 0,
-      contributionType: '',
-      contributionDescription: '',
-      dateOfContribution: '',
+      contributionType: "",
+      contributionDescription: "",
+      dateOfContribution: "",
       contributionAmount: 0,
     });
 
-    recalculateSummary([...beneficiaries, newBeneficiary]);
+    recalculateSummary(updatedBeneficiaries);
   };
 
   const recalculateSummary = (updatedBeneficiaries) => {
@@ -56,7 +79,8 @@ const SocioEconomicDevelopment = ({ onClose, onSubmit }) => {
       totalBlackParticipation += Number(beneficiary.blackParticipationPercentage);
     });
 
-    const averageBlackParticipation = totalBeneficiaries > 0 ? (totalBlackParticipation / totalBeneficiaries).toFixed(2) : 0;
+    const averageBlackParticipation =
+      totalBeneficiaries > 0 ? (totalBlackParticipation / totalBeneficiaries).toFixed(2) : 0;
 
     setSummary({
       totalBeneficiaries,
@@ -65,10 +89,26 @@ const SocioEconomicDevelopment = ({ onClose, onSubmit }) => {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onSubmit({ beneficiaries, summary });
-    onClose();
+    try {
+      const payload = { userId, beneficiaries, summary };
+      const response = await fetch("http://localhost:5000/socio-economic-development", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+      const data = await response.json();
+      console.log("Socio-economic development data saved:", data);
+      onSubmit(payload);
+      onClose();
+    } catch (error) {
+      console.error("Error saving socio-economic development data:", error);
+      alert(`Failed to save socio-economic development data: ${error.message}`);
+    }
   };
 
   return (
@@ -125,14 +165,20 @@ const SocioEconomicDevelopment = ({ onClose, onSubmit }) => {
                   className="w-full p-2 border rounded"
                 >
                   <option value="">Select Contribution Type</option>
-        <option value="Grant">Grant</option>
-        <option value="Direct Cost">Direct Cost</option>
-        <option value="Discounts">Discounts</option>
-        <option value="Overhead Costs">Overhead Costs</option>
-        <option value="Professional Services rendered at no cost">Professional Services rendered at no cost</option>
-        <option value="Professional Services rendered at a discount">Professional Services rendered at a discount</option>
-        <option value="Time of employee deployed in assisting beneficiaries">Time of employee deployed in assisting beneficiaries</option>
-      </select>
+                  <option value="Grant">Grant</option>
+                  <option value="Direct Cost">Direct Cost</option>
+                  <option value="Discounts">Discounts</option>
+                  <option value="Overhead Costs">Overhead Costs</option>
+                  <option value="Professional Services rendered at no cost">
+                    Professional Services rendered at no cost
+                  </option>
+                  <option value="Professional Services rendered at a discount">
+                    Professional Services rendered at a discount
+                  </option>
+                  <option value="Time of employee deployed in assisting beneficiaries">
+                    Time of employee deployed in assisting beneficiaries
+                  </option>
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Description of Contribution</label>
@@ -197,10 +243,14 @@ const SocioEconomicDevelopment = ({ onClose, onSubmit }) => {
                     {beneficiaries.map((beneficiary, index) => (
                       <tr key={index}>
                         <td className="border border-gray-300 px-4 py-2">{beneficiary.beneficiaryName}</td>
-                        <td className="border border-gray-300 px-4 py-2">{beneficiary.siteLocation || 'N/A'}</td>
-                        <td className="border border-gray-300 px-4 py-2">{beneficiary.blackParticipationPercentage}%</td>
+                        <td className="border border-gray-300 px-4 py-2">{beneficiary.siteLocation || "N/A"}</td>
+                        <td className="border border-gray-300 px-4 py-2">
+                          {beneficiary.blackParticipationPercentage}%
+                        </td>
                         <td className="border border-gray-300 px-4 py-2">{beneficiary.contributionType}</td>
-                        <td className="border border-gray-300 px-4 py-2">{beneficiary.contributionDescription}</td>
+                        <td className="border border-gray-300 px-4 py-2">
+                          {beneficiary.contributionDescription}
+                        </td>
                         <td className="border border-gray-300 px-4 py-2">{beneficiary.dateOfContribution}</td>
                         <td className="border border-gray-300 px-4 py-2">{beneficiary.contributionAmount}</td>
                       </tr>

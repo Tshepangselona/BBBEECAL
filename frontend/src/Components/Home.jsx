@@ -504,6 +504,7 @@ const Home = () => {
       
       {showSocioEconomicDevelopmentModal && (
         <SocioEconomicDevelopment
+          userId={userId} // Pass userId here
           onClose={() => setShowSocioEconomicDevelopmentModal(false)}
           onSubmit={handleSocioEconomicDevelopmentSubmit}
         />
