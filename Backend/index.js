@@ -726,4 +726,93 @@ app.get("/enterprise-development/:userId", async (req, res) => {
   }
 });
 
+// Socio-Economic Development - Create
+app.post("/socio-economic-development", async (req, res) => {
+  console.log("Socio-Economic Development POST hit with body:", req.body);
+  const { userId, beneficiaries, summary } = req.body;
+
+  try {
+    if (!userId) {
+      console.log("Missing userId");
+      return res.status(400).json({ error: "User ID is required" });
+    }
+    if (!beneficiaries || !Array.isArray(beneficiaries)) {
+      console.log("Invalid beneficiaries data");
+      return res.status(400).json({ error: "Beneficiaries must be an array" });
+    }
+    if (!summary || typeof summary !== "object") {
+      console.log("Invalid summary data");
+      return res.status(400).json({ error: "Summary must be an object" });
+    }
+
+    const userDoc = await getDoc(doc(db, "users", userId));
+    if (!userDoc.exists()) {
+      console.log("User not found for userId:", userId);
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const socioEconomicDevelopmentData = {
+      userId,
+      beneficiaries: beneficiaries.map((beneficiary) => ({
+        beneficiaryName: beneficiary.beneficiaryName || "",
+        siteLocation: beneficiary.siteLocation || "",
+        blackParticipationPercentage: Number(beneficiary.blackParticipationPercentage) || 0,
+        contributionType: beneficiary.contributionType || "",
+        contributionDescription: beneficiary.contributionDescription || "",
+        dateOfContribution: beneficiary.dateOfContribution || "",
+        contributionAmount: Number(beneficiary.contributionAmount) || 0,
+      })),
+      summary: {
+        totalBeneficiaries: Number(summary.totalBeneficiaries) || 0,
+        totalContributionAmount: Number(summary.totalContributionAmount) || 0,
+        averageBlackParticipation: Number(summary.averageBlackParticipation) || 0,
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const docRef = await addDoc(collection(db, "socioEconomicDevelopment"), socioEconomicDevelopmentData);
+
+    res.status(201).json({
+      message: "Socio-economic development data saved successfully",
+      id: docRef.id,
+      ...socioEconomicDevelopmentData,
+    });
+  } catch (error) {
+    console.error("Detailed error:", error);
+    res.status(400).json({ error: error.message, code: error.code });
+  }
+});
+
+// Socio-Economic Development - Retrieve
+app.get("/socio-economic-development/:userId", async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const socioEconomicRef = collection(db, "socioEconomicDevelopment");
+    const q = query(socioEconomicRef, where("userId", "==", userId));
+    const querySnapshot = await getDocs(q);
+
+    const socioEconomicRecords = [];
+    querySnapshot.forEach((doc) => {
+      socioEconomicRecords.push({
+        id: doc.id,
+        ...doc.data(),
+      });
+    });
+
+    if (socioEconomicRecords.length === 0) {
+      return res.status(404).json({ message: "No socio-economic development data found for this user" });
+    }
+
+    res.status(200).json({
+      message: "Socio-economic development data retrieved successfully",
+      data: socioEconomicRecords,
+    });
+  } catch (error) {
+    console.error("Socio-economic development retrieval error:", error.code, error.message);
+    res.status(500).json({ error: error.message, code: error.code });
+  }
+});
+
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
