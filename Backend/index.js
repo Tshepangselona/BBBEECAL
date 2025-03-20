@@ -631,4 +631,99 @@ app.get("/ownership-details/:userId", async (req, res) => {
   }
 });
 
+// Enterprise Development - Create
+app.post("/enterprise-development", async (req, res) => {
+  console.log("Enterprise Development POST hit with body:", req.body);
+  const { userId, beneficiaries, summary } = req.body;
+
+  try {
+    if (!userId) {
+      console.log("Missing userId");
+      return res.status(400).json({ error: "User ID is required" });
+    }
+    if (!beneficiaries || !Array.isArray(beneficiaries)) {
+      console.log("Invalid beneficiaries data");
+      return res.status(400).json({ error: "Beneficiaries must be an array" });
+    }
+    if (!summary || typeof summary !== "object") {
+      console.log("Invalid summary data");
+      return res.status(400).json({ error: "Summary must be an object" });
+    }
+
+    const userDoc = await getDoc(doc(db, "users", userId));
+    if (!userDoc.exists()) {
+      console.log("User not found for userId:", userId);
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const enterpriseDevelopmentData = {
+      userId,
+      beneficiaries: beneficiaries.map((beneficiary) => ({
+        beneficiaryName: beneficiary.beneficiaryName || "",
+        siteLocation: beneficiary.siteLocation || "",
+        isSupplierDevelopmentBeneficiary: Boolean(beneficiary.isSupplierDevelopmentBeneficiary),
+        blackOwnershipPercentage: Number(beneficiary.blackOwnershipPercentage) || 0,
+        blackWomenOwnershipPercentage: Number(beneficiary.blackWomenOwnershipPercentage) || 0,
+        beeStatusLevel: beneficiary.beeStatusLevel || "",
+        contributionType: beneficiary.contributionType || "",
+        contributionDescription: beneficiary.contributionDescription || "",
+        dateOfContribution: beneficiary.dateOfContribution || "",
+        paymentDate: beneficiary.paymentDate || "",
+        contributionAmount: Number(beneficiary.contributionAmount) || 0,
+      })),
+      summary: {
+        totalBeneficiaries: Number(summary.totalBeneficiaries) || 0,
+        totalContributionAmount: Number(summary.totalContributionAmount) || 0,
+        supplierDevelopmentBeneficiaries: Number(summary.supplierDevelopmentBeneficiaries) || 0,
+        blackOwnedBeneficiaries: Number(summary.blackOwnedBeneficiaries) || 0,
+        blackWomenOwnedBeneficiaries: Number(summary.blackWomenOwnedBeneficiaries) || 0,
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const docRef = await addDoc(collection(db, "enterpriseDevelopment"), enterpriseDevelopmentData);
+
+    res.status(201).json({
+      message: "Enterprise development data saved successfully",
+      id: docRef.id,
+      ...enterpriseDevelopmentData,
+    });
+  } catch (error) {
+    console.error("Detailed error:", error);
+    res.status(400).json({ error: error.message, code: error.code });
+  }
+});
+
+// Enterprise Development - Retrieve
+app.get("/enterprise-development/:userId", async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const enterpriseRef = collection(db, "enterpriseDevelopment");
+    const q = query(enterpriseRef, where("userId", "==", userId));
+    const querySnapshot = await getDocs(q);
+
+    const enterpriseRecords = [];
+    querySnapshot.forEach((doc) => {
+      enterpriseRecords.push({
+        id: doc.id,
+        ...doc.data(),
+      });
+    });
+
+    if (enterpriseRecords.length === 0) {
+      return res.status(404).json({ message: "No enterprise development data found for this user" });
+    }
+
+    res.status(200).json({
+      message: "Enterprise development data retrieved successfully",
+      data: enterpriseRecords,
+    });
+  } catch (error) {
+    console.error("Enterprise development retrieval error:", error.code, error.message);
+    res.status(500).json({ error: error.message, code: error.code });
+  }
+});
+
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

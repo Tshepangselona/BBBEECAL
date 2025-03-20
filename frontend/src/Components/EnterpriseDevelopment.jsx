@@ -1,18 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from "react";
 
-const EnterpriseDevelopment = ({ onClose, onSubmit }) => {
+const EnterpriseDevelopment = ({ userId, onClose, onSubmit }) => {
   const [beneficiaries, setBeneficiaries] = useState([]);
   const [newBeneficiary, setNewBeneficiary] = useState({
-    beneficiaryName: '',
-    siteLocation: '',
+    beneficiaryName: "",
+    siteLocation: "",
     isSupplierDevelopmentBeneficiary: false,
     blackOwnershipPercentage: 0,
     blackWomenOwnershipPercentage: 0,
-    beeStatusLevel: '',
-    contributionType: '',
-    contributionDescription: '',
-    dateOfContribution: '',
-    paymentDate: '',
+    beeStatusLevel: "",
+    contributionType: "",
+    contributionDescription: "",
+    dateOfContribution: "",
+    paymentDate: "",
     contributionAmount: 0,
   });
 
@@ -24,36 +24,66 @@ const EnterpriseDevelopment = ({ onClose, onSubmit }) => {
     blackWomenOwnedBeneficiaries: 0,
   });
 
+  // Fetch existing data when component mounts
+  useEffect(() => {
+    const fetchEnterpriseData = async () => {
+      try {
+        const response = await fetch(`http://localhost:5000/enterprise-development/${userId}`);
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+        const { data } = await response.json();
+        if (data.length > 0) {
+          setBeneficiaries(data[0].beneficiaries);
+          setSummary(data[0].summary);
+        }
+      } catch (error) {
+        console.error("Error fetching enterprise development data:", error);
+      }
+    };
+    if (userId) fetchEnterpriseData();
+  }, [userId]);
+
   const handleBeneficiaryChange = (e) => {
     const { name, value, type, checked } = e.target;
     setNewBeneficiary({
       ...newBeneficiary,
-      [name]: type === 'checkbox' ? checked : value,
+      [name]:
+        type === "checkbox"
+          ? checked
+          : type === "number"
+          ? value === ""
+            ? 0
+            : Number(value)
+          : value,
     });
   };
 
   const addBeneficiary = () => {
-    if (!newBeneficiary.beneficiaryName || !newBeneficiary.contributionAmount || !newBeneficiary.contributionType) {
-      alert('Please fill in the Beneficiary Name, Contribution Amount, and Contribution Type.');
+    if (
+      !newBeneficiary.beneficiaryName ||
+      !newBeneficiary.contributionAmount ||
+      !newBeneficiary.contributionType
+    ) {
+      alert("Please fill in the Beneficiary Name, Contribution Amount, and Contribution Type.");
       return;
     }
 
-    setBeneficiaries([...beneficiaries, newBeneficiary]);
+    const updatedBeneficiaries = [...beneficiaries, newBeneficiary];
+    setBeneficiaries(updatedBeneficiaries);
     setNewBeneficiary({
-      beneficiaryName: '',
-      siteLocation: '',
+      beneficiaryName: "",
+      siteLocation: "",
       isSupplierDevelopmentBeneficiary: false,
       blackOwnershipPercentage: 0,
       blackWomenOwnershipPercentage: 0,
-      beeStatusLevel: '',
-      contributionType: '',
-      contributionDescription: '',
-      dateOfContribution: '',
-      paymentDate: '',
+      beeStatusLevel: "",
+      contributionType: "",
+      contributionDescription: "",
+      dateOfContribution: "",
+      paymentDate: "",
       contributionAmount: 0,
     });
 
-    recalculateSummary([...beneficiaries, newBeneficiary]);
+    recalculateSummary(updatedBeneficiaries);
   };
 
   const recalculateSummary = (updatedBeneficiaries) => {
@@ -79,10 +109,26 @@ const EnterpriseDevelopment = ({ onClose, onSubmit }) => {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onSubmit({ beneficiaries, summary });
-    onClose();
+    try {
+      const payload = { userId, beneficiaries, summary };
+      const response = await fetch("http://localhost:5000/enterprise-development", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+      const data = await response.json();
+      console.log("Enterprise development data saved:", data);
+      onSubmit(payload);
+      onClose();
+    } catch (error) {
+      console.error("Error saving enterprise development data:", error);
+      alert(`Failed to save enterprise development data: ${error.message}`);
+    }
   };
 
   return (
@@ -179,19 +225,27 @@ const EnterpriseDevelopment = ({ onClose, onSubmit }) => {
                   className="w-full p-2 border rounded"
                 >
                   <option value="">Select Contribution Type</option>
-        <option value="Grant">Grant</option>
-        <option value="Direct Cost">Direct Cost</option>
-        <option value="Discounts">Discounts</option>
-        <option value="Overhead Costs">Overhead Costs</option>
-        <option value="Interest-Free Loan">Interest-Free Loan</option>
-        <option value="Loan to Black owned EME/QSE">Loan to Black owned EME/QSE</option>
-        <option value="Standard Loan">Standard Loan</option>
-        <option value="Guarantees provided on behalf of Beneficiary">Guarantees provided on behalf of Beneficiary</option>
-        <option value="Lower Interest Rate">Lower Interest Rate</option>
-        <option value="Minor Investment in Black EME/QSE">Minor Investment in Black EME/QSE</option>
-        <option value="Major Investment in other Enterprises">Major Investment in other Enterprises</option>
-        <option value="Investment with lower dividend to financier">Investment with lower dividend to financier</option>
-      </select>
+                  <option value="Grant">Grant</option>
+                  <option value="Direct Cost">Direct Cost</option>
+                  <option value="Discounts">Discounts</option>
+                  <option value="Overhead Costs">Overhead Costs</option>
+                  <option value="Interest-Free Loan">Interest-Free Loan</option>
+                  <option value="Loan to Black owned EME/QSE">Loan to Black owned EME/QSE</option>
+                  <option value="Standard Loan">Standard Loan</option>
+                  <option value="Guarantees provided on behalf of Beneficiary">
+                    Guarantees provided on behalf of Beneficiary
+                  </option>
+                  <option value="Lower Interest Rate">Lower Interest Rate</option>
+                  <option value="Minor Investment in Black EME/QSE">
+                    Minor Investment in Black EME/QSE
+                  </option>
+                  <option value="Major Investment in other Enterprises">
+                    Major Investment in other Enterprises
+                  </option>
+                  <option value="Investment with lower dividend to financier">
+                    Investment with lower dividend to financier
+                  </option>
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Description of Contribution</label>
@@ -270,13 +324,21 @@ const EnterpriseDevelopment = ({ onClose, onSubmit }) => {
                     {beneficiaries.map((beneficiary, index) => (
                       <tr key={index}>
                         <td className="border border-gray-300 px-4 py-2">{beneficiary.beneficiaryName}</td>
-                        <td className="border border-gray-300 px-4 py-2">{beneficiary.siteLocation || 'N/A'}</td>
-                        <td className="border border-gray-300 px-4 py-2">{beneficiary.isSupplierDevelopmentBeneficiary ? 'Yes' : 'No'}</td>
-                        <td className="border border-gray-300 px-4 py-2">{beneficiary.blackOwnershipPercentage}%</td>
-                        <td className="border border-gray-300 px-4 py-2">{beneficiary.blackWomenOwnershipPercentage}%</td>
+                        <td className="border border-gray-300 px-4 py-2">{beneficiary.siteLocation || "N/A"}</td>
+                        <td className="border border-gray-300 px-4 py-2">
+                          {beneficiary.isSupplierDevelopmentBeneficiary ? "Yes" : "No"}
+                        </td>
+                        <td className="border border-gray-300 px-4 py-2">
+                          {beneficiary.blackOwnershipPercentage}%
+                        </td>
+                        <td className="border border-gray-300 px-4 py-2">
+                          {beneficiary.blackWomenOwnershipPercentage}%
+                        </td>
                         <td className="border border-gray-300 px-4 py-2">{beneficiary.beeStatusLevel}</td>
                         <td className="border border-gray-300 px-4 py-2">{beneficiary.contributionType}</td>
-                        <td className="border border-gray-300 px-4 py-2">{beneficiary.contributionDescription}</td>
+                        <td className="border border-gray-300 px-4 py-2">
+                          {beneficiary.contributionDescription}
+                        </td>
                         <td className="border border-gray-300 px-4 py-2">{beneficiary.dateOfContribution}</td>
                         <td className="border border-gray-300 px-4 py-2">{beneficiary.paymentDate}</td>
                         <td className="border border-gray-300 px-4 py-2">{beneficiary.contributionAmount}</td>
