@@ -496,6 +496,7 @@ const Home = () => {
 
 {showEnterpriseDevelopmentModal && (
         <EnterpriseDevelopment
+          userId={userId} // Pass userId here
           onClose={() => setShowEnterpriseDevelopmentModal(false)}
           onSubmit={handleEnterpriseDevelopmentSubmit}
         />
