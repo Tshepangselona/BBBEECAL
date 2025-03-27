@@ -4,10 +4,11 @@ import OwnershipDetails from './OwnershipDetails';
 import ManagementControl from './ManagementControl';
 import EmploymentEquity from './EmploymentEquity';
 import Yes4YouthInitiative from './Yes4YouthInitiative';
-import SkillsDevelopment  from "./SkillsDevelopment";
+import SkillsDevelopment from "./SkillsDevelopment";
 import SupplierDevelopment from "./SupplierDevelopment";
 import EnterpriseDevelopment from './EnterpriseDevelopment';
 import SocioEconomicDevelopment from "./SocioEconomicDevelopment";
+import Results from './Results';
 
 const Home = () => {
   const location = useLocation();
@@ -16,6 +17,7 @@ const Home = () => {
   const [financialData, setFinancialData] = useState({
     companyName: '',
     yearEnd: '',
+    sector: '',
     turnover: 0,
     npbt: 0,
     npat: 0,
@@ -40,6 +42,8 @@ const Home = () => {
   const [showSupplierDevelopmentModal, setShowSupplierDevelopmentModal] = useState(false);
   const [showEnterpriseDevelopmentModal, setShowEnterpriseDevelopmentModal] = useState(false);
   const [showSocioEconomicDevelopmentModal, setShowSocioEconomicDevelopmentModal] = useState(false);
+  const [showResultsModal, setShowResultsModal] = useState(false);
+  const [results, setResults] = useState(null);
   const [ownershipDetails, setOwnershipDetails] = useState(null);
   const [managementDetails, setManagementDetails] = useState(null);
   const [employmentDetails, setEmploymentDetails] = useState(null);
@@ -107,6 +111,7 @@ const Home = () => {
           ...prevData,
           companyName: userData.businessName || prevData.companyName,
           yearEnd: formattedYearEnd || prevData.yearEnd,
+          sector: userData.sector || '',
         };
         console.log("Updated financialData:", updatedData);
         return updatedData;
@@ -119,12 +124,11 @@ const Home = () => {
     }
   }, [location, navigate]);
 
-  // ... Rest of your component (handleInputChange, handleSubmit functions, JSX) remains unchanged ...
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFinancialData((prevData) => ({
       ...prevData,
-      [name]: name === "yearEnd" ? value : Number(value) || 0,
+      [name]: name === "yearEnd" || name === "sector" ? value : Number(value) || 0,
     }));
   };
 
@@ -147,21 +151,201 @@ const Home = () => {
     setYesDetails(data);
     setShowYesModal(false);
   };
+
   const handleSkillsDevelopmentSubmit = (data) => {
     setSkillsDevelopmentDetails(data);
     setShowSkillsDevelopmentModal(false);
   };
+
   const handleSupplierDevelopmentSubmit = (data) => {
     setSupplierDevelopmentDetails(data);
     setShowSupplierDevelopmentModal(false);
   };
+
   const handleEnterpriseDevelopmentSubmit = (data) => {
     setEnterpriseDevelopmentDetails(data);
     setShowEnterpriseDevelopmentModal(false);
   };
+
   const handleSocioEconomicDevelopmentSubmit = (data) => {
     setSocioEconomicDevelopmentDetails(data);
     setShowSocioEconomicDevelopmentModal(false);
+  };
+
+  // Define sector-specific scorecards
+  const sectorScorecards = {
+    Generic: {
+      ownership: { weight: 25, target: 0.25 },
+      managementControl: { weight: 19, target: 0.5 },
+      skillsDevelopment: { weight: 20, target: 0.06 },
+      esd: { weight: 30, targetSupplier: 0.1, targetEnterprise: 0.01 }, // Combined ESD
+      socioEconomicDevelopment: { weight: 5, target: 0.01 },
+      yesBonus: { weight: 5 },
+      totalWeight: 99, // Excluding YES bonus
+    },
+    Tourism: {
+      ownership: { weight: 27, target: 0.3 },
+      managementControl: { weight: 15, target: 0.6 },
+      skillsDevelopment: { weight: 20, target: 0.08 },
+      esd: { weight: 30, targetSupplier: 0.15, targetEnterprise: 0.015 },
+      socioEconomicDevelopment: { weight: 8, target: 0.015 },
+      yesBonus: { weight: 5 },
+      totalWeight: 100,
+    },
+    Construction: {
+      ownership: { weight: 25, target: 0.32 },
+      managementControl: { weight: 17, target: 0.5 },
+      skillsDevelopment: { weight: 21, target: 0.06 },
+      esd: { weight: 30, targetSupplier: 0.12, targetEnterprise: 0.01 },
+      socioEconomicDevelopment: { weight: 5, target: 0.01 },
+      yesBonus: { weight: 5 },
+      totalWeight: 98,
+    },
+    ICT: {
+      ownership: { weight: 25, target: 0.3 },
+      managementControl: { weight: 19, target: 0.5 },
+      skillsDevelopment: { weight: 22, target: 0.07 },
+      esd: { weight: 30, targetSupplier: 0.1, targetEnterprise: 0.01 },
+      socioEconomicDevelopment: { weight: 5, target: 0.01 },
+      yesBonus: { weight: 5 },
+      totalWeight: 101,
+    },
+  };
+
+  const calculateBBBEEScore = () => {
+    const sector = financialData.sector || 'Generic';
+    const scorecard = sectorScorecards[sector] || sectorScorecards.Generic;
+
+    let ownershipScore = 0;
+    let managementControlScore = 0;
+    let skillsDevelopmentScore = 0;
+    let esdScore = 0; // Combined ESD score
+    let socioEconomicDevelopmentScore = 0;
+    let yesBonusPoints = 0;
+
+    // Ownership Score
+    if (ownershipDetails?.ownershipData) {
+      const blackOwnership = ownershipDetails.ownershipData.blackOwnershipPercentage || 0;
+      const ownershipRatio = blackOwnership / 100 / scorecard.ownership.target;
+      ownershipScore = Math.min(ownershipRatio * scorecard.ownership.weight, scorecard.ownership.weight);
+    }
+
+    // Management Control Score
+    if (managementDetails?.managementData) {
+      const blackVotingRights = managementDetails.managementData.blackVotingRights || 0;
+      const blackEconomicInterest = managementDetails.managementData.blackEconomicInterest || 0;
+      const avgRepresentation = (blackVotingRights + blackEconomicInterest) / 2 / 100;
+      const managementRatio = avgRepresentation / scorecard.managementControl.target;
+      managementControlScore = Math.min(managementRatio * scorecard.managementControl.weight, scorecard.managementControl.weight);
+    }
+
+    // Skills Development Score
+    if (skillsDevelopmentDetails?.summary) {
+      const totalExpenditure = skillsDevelopmentDetails.summary.totalDirectExpenditure || 0;
+      const targetSpend = financialData.totalLeviableAmount * scorecard.skillsDevelopment.target;
+      const expenditureRatio = targetSpend > 0 ? totalExpenditure / targetSpend : 0;
+      skillsDevelopmentScore = Math.min(expenditureRatio * scorecard.skillsDevelopment.weight, scorecard.skillsDevelopment.weight);
+    }
+
+    // Combined ESD Score (Enterprise and Supplier Development)
+    let supplierDevelopmentScore = 0;
+    let enterpriseDevelopmentScore = 0;
+    const esdWeight = scorecard.esd.weight;
+    const supplierWeight = esdWeight / 2; // Split the weight equally for simplicity
+    const enterpriseWeight = esdWeight / 2;
+
+    // Supplier Development Component
+    if (supplierDevelopmentDetails?.localSummary) {
+      const totalProcurementSpend = financialData.totalMeasuredProcurementSpend || 1;
+      const blackOwnedSpend = supplierDevelopmentDetails.localSummary.totalExpenditure * 
+        (supplierDevelopmentDetails.localSummary.blackOwnedSuppliers / (supplierDevelopmentDetails.localSummary.totalSuppliers || 1));
+      const targetSpend = totalProcurementSpend * scorecard.esd.targetSupplier;
+      const spendRatio = targetSpend > 0 ? blackOwnedSpend / targetSpend : 0;
+      supplierDevelopmentScore = Math.min(spendRatio * supplierWeight, supplierWeight);
+    }
+
+    // Enterprise Development Component
+    if (enterpriseDevelopmentDetails?.summary) {
+      const totalContribution = enterpriseDevelopmentDetails.summary.totalContribution || 0;
+      const targetContribution = financialData.npat * scorecard.esd.targetEnterprise;
+      const contributionRatio = targetContribution > 0 ? totalContribution / targetContribution : 0;
+      enterpriseDevelopmentScore = Math.min(contributionRatio * enterpriseWeight, enterpriseWeight);
+    }
+
+    // Combine into ESD Score
+    esdScore = supplierDevelopmentScore + enterpriseDevelopmentScore;
+
+    // Socio-Economic Development Score
+    if (socioEconomicDevelopmentDetails?.summary) {
+      const totalContribution = socioEconomicDevelopmentDetails.summary.totalContribution || 0;
+      const targetContribution = financialData.npat * scorecard.socioEconomicDevelopment.target;
+      const contributionRatio = targetContribution > 0 ? totalContribution / targetContribution : 0;
+      socioEconomicDevelopmentScore = Math.min(contributionRatio * scorecard.socioEconomicDevelopment.weight, scorecard.socioEconomicDevelopment.weight);
+    }
+
+    // YES 4 Youth Bonus Points
+    if (yesDetails?.yesData) {
+      const participants = yesDetails.yesData.totalParticipants || 0;
+      yesBonusPoints = Math.min(participants * 1, scorecard.yesBonus.weight);
+    }
+
+    // Total Score
+    const totalScore = (
+      ownershipScore +
+      managementControlScore +
+      skillsDevelopmentScore +
+      esdScore +
+      socioEconomicDevelopmentScore +
+      yesBonusPoints
+    );
+
+    // Determine B-BBEE Level and Status
+    let bbeeLevel = "Non-compliant";
+    let bbeeStatus = "0%";
+    const maxScore = scorecard.totalWeight + scorecard.yesBonus.weight;
+    if (totalScore >= 100) {
+      bbeeLevel = "Level 1";
+      bbeeStatus = "135%";
+    } else if (totalScore >= 95) {
+      bbeeLevel = "Level 2";
+      bbeeStatus = "125%";
+    } else if (totalScore >= 90) {
+      bbeeLevel = "Level 3";
+      bbeeStatus = "110%";
+    } else if (totalScore >= 80) {
+      bbeeLevel = "Level 4";
+      bbeeStatus = "100%";
+    } else if (totalScore >= 75) {
+      bbeeLevel = "Level 5";
+      bbeeStatus = "80%";
+    } else if (totalScore >= 70) {
+      bbeeLevel = "Level 6";
+      bbeeStatus = "60%";
+    } else if (totalScore >= 55) {
+      bbeeLevel = "Level 7";
+      bbeeStatus = "50%";
+    } else if (totalScore >= 40) {
+      bbeeLevel = "Level 8";
+      bbeeStatus = "10%";
+    }
+
+    // Set results
+    setResults({
+      sector,
+      ownershipScore,
+      managementControlScore,
+      skillsDevelopmentScore,
+      esdScore,
+      socioEconomicDevelopmentScore,
+      yesBonusPoints,
+      totalScore,
+      maxScore,
+      bbeeLevel,
+      bbeeStatus,
+      scorecard,
+    });
+
+    setShowResultsModal(true);
   };
 
   if (loading) {
@@ -207,7 +391,7 @@ const Home = () => {
       {/* Company Information */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <h2 className="text-xl font-semibold mb-4">Company Information</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1">Company Name</label>
             <input
@@ -228,6 +412,21 @@ const Home = () => {
               placeholder="e.g., 31/Mar/2025"
               className="w-full p-2 border rounded"
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Sector</label>
+            <select
+              name="sector"
+              value={financialData.sector}
+              onChange={handleInputChange}
+              className="w-full p-2 border rounded"
+            >
+              <option value="">Select Sector</option>
+              <option value="Generic">Generic</option>
+              <option value="Tourism">Tourism</option>
+              <option value="Construction">Construction</option>
+              <option value="ICT">ICT</option>
+            </select>
           </div>
         </div>
       </div>
@@ -264,33 +463,33 @@ const Home = () => {
       </div>
 
       {/* Skills Development */}
-    <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-      <h2 className="text-xl font-semibold mb-4">Skills Development</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">Total SDL Payments (R)</label>
-          <input
-            type="number"
-            name="sdlPayments"
-            value={financialData.sdlPayments}
-            onChange={handleInputChange}
-            className="w-full p-2 border rounded"
-            placeholder="Enter SDL payments"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Total Leviable Amount (R)</label>
-          <input
-            type="number"
-            name="totalLeviableAmount"
-            value={financialData.totalLeviableAmount}
-            onChange={handleInputChange}
-            className="w-full p-2 border rounded"
-            placeholder="Enter total leviable amount"
-          />
+      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 className="text-xl font-semibold mb-4">Skills Development</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Total SDL Payments (R)</label>
+            <input
+              type="number"
+              name="sdlPayments"
+              value={financialData.sdlPayments}
+              onChange={handleInputChange}
+              className="w-full p-2 border rounded"
+              placeholder="Enter SDL payments"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Total Leviable Amount (R)</label>
+            <input
+              type="number"
+              name="totalLeviableAmount"
+              value={financialData.totalLeviableAmount}
+              onChange={handleInputChange}
+              className="w-full p-2 border rounded"
+              placeholder="Enter total leviable amount"
+            />
+          </div>
         </div>
       </div>
-    </div>
 
       {/* Procurement */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
@@ -381,25 +580,25 @@ const Home = () => {
       </div>
 
       {/* Skills Development Details */}
-    <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-      <h2 className="text-xl font-semibold mb-4">Skills Development Details</h2>
-      <div className="flex justify-between items-center">
-        <p>
-          {skillsDevelopmentDetails?.summary
-            ? `Skills development details added (Total Trainings: ${skillsDevelopmentDetails.summary.totalTrainings})`
-            : "Add skills development details to calculate your B-BBEE skills development score"}
-        </p>
-        <button
-          onClick={() => setShowSkillsDevelopmentModal(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-        >
-          {skillsDevelopmentDetails ? "Edit Skills Development Details" : "Add Skills Development Details"}
-        </button>
+      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 className="text-xl font-semibold mb-4">Skills Development Details</h2>
+        <div className="flex justify-between items-center">
+          <p>
+            {skillsDevelopmentDetails?.summary
+              ? `Skills development details added (Total Trainings: ${skillsDevelopmentDetails.summary.totalTrainings})`
+              : "Add skills development details to calculate your B-BBEE skills development score"}
+          </p>
+          <button
+            onClick={() => setShowSkillsDevelopmentModal(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+          >
+            {skillsDevelopmentDetails ? "Edit Skills Development Details" : "Add Skills Development Details"}
+          </button>
+        </div>
       </div>
-    </div>
 
-    {/* Supplier Development & Imports */}
-    <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+      {/* Supplier Development & Imports */}
+      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <h2 className="text-xl font-semibold mb-4">Supplier Development & Imports</h2>
         <div className="flex justify-between items-center">
           <p>
@@ -462,12 +661,12 @@ const Home = () => {
       )}
       {showManagementModal && (
         <ManagementControl
-          userId={userId} // Pass userId here
+          userId={userId}
           onClose={() => setShowManagementModal(false)}
           onSubmit={handleManagementSubmit}
         />
       )}
-      {showEmploymentModal && ( 
+      {showEmploymentModal && (
         <EmploymentEquity
           userId={userId}
           onClose={() => setShowEmploymentModal(false)}
@@ -476,7 +675,7 @@ const Home = () => {
       )}
       {showYesModal && (
         <Yes4YouthInitiative
-          userId={userId} // Pass userId here
+          userId={userId}
           onClose={() => setShowYesModal(false)}
           onSubmit={handleYesSubmit}
         />
@@ -493,10 +692,8 @@ const Home = () => {
           onSubmit={handleSupplierDevelopmentSubmit}
         />
       )}
-
-{showEnterpriseDevelopmentModal && (
+      {showEnterpriseDevelopmentModal && (
         <EnterpriseDevelopment
-          userId={userId} // Pass userId here
           onClose={() => setShowEnterpriseDevelopmentModal(false)}
           onSubmit={handleEnterpriseDevelopmentSubmit}
         />
@@ -509,10 +706,19 @@ const Home = () => {
           onSubmit={handleSocioEconomicDevelopmentSubmit}
         />
       )}
+      {showResultsModal && (
+        <Results
+          onClose={() => setShowResultsModal(false)}
+          results={results}
+        />
+      )}
 
       {/* Submit Button */}
       <div className="flex justify-center mt-6">
-        <button className="bg-green-600 text-white px-8 py-3 rounded-md hover:bg-green-700 font-bold text-lg">
+        <button
+          onClick={calculateBBBEEScore}
+          className="bg-green-600 text-white px-8 py-3 rounded-md hover:bg-green-700 font-bold text-lg"
+        >
           Calculate B-BBEE Score
         </button>
       </div>
