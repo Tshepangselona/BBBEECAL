@@ -1,20 +1,27 @@
+require('dotenv').config(); // Add this at the top
 const express = require("express");
 const cors = require("cors");
 const { auth, db } = require("./firebase");
-const { createUserWithEmailAndPassword, signInWithEmailAndPassword } = require("firebase/auth");
-const { doc, setDoc, getDoc, collection, addDoc, query, where, getDocs } = require("firebase/firestore");
+const { createUserWithEmailAndPassword } = require("firebase/auth");
+const { doc, setDoc } = require("firebase/firestore");
+const SibApiV3Sdk = require('sib-api-v3-sdk');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Log all incoming requests
 app.use((req, res, next) => {
   console.log(`Incoming request: ${req.method} ${req.url}`);
   next();
 });
 
 const PORT = process.env.PORT || 5000;
+
+// Configure Brevo API client
+const defaultClient = SibApiV3Sdk.ApiClient.instance;
+const apiKey = defaultClient.authentications['api-key'];
+apiKey.apiKey = process.env.BREVO_API_KEY; // Use env variable
+const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
 
 const validateDateFormat = (dateStr) => {
   const regex = /^(\d{2})\/([A-Za-z]{3})\/(\d{4})$/;
@@ -34,12 +41,14 @@ const validateDateFormat = (dateStr) => {
   return true;
 };
 
-// SignUp route
 app.post("/signup", async (req, res) => {
   const { businessEmail, password, businessName, financialYearEnd, address, contactNumber } = req.body;
 
+  console.log("Request body:", req.body);
+
   try {
     if (!validateDateFormat(financialYearEnd)) {
+      console.log("Invalid date format:", financialYearEnd);
       return res.status(400).json({ error: "Invalid financial year end format. Please use DD/MMM/YYYY (e.g., 31/Mar/2025)" });
     }
 
@@ -49,12 +58,15 @@ app.post("/signup", async (req, res) => {
     const dateObject = new Date(year, month, day);
 
     if (isNaN(dateObject.getTime())) {
+      console.log("Invalid date parsed:", financialYearEnd);
       return res.status(400).json({ error: "Invalid date value for Financial Year End" });
     }
 
+    console.log("Creating Firebase user with:", { businessEmail, password });
     const userCredential = await createUserWithEmailAndPassword(auth, businessEmail, password);
     const user = userCredential.user;
 
+    console.log("Saving to Firestore for UID:", user.uid);
     await setDoc(doc(db, "users", user.uid), {
       businessName,
       financialYearEnd: dateObject,
@@ -64,17 +76,90 @@ app.post("/signup", async (req, res) => {
       createdAt: new Date().toISOString(),
     });
 
+    console.log("Preparing to send user email to:", businessEmail);
+    const userEmail = new SibApiV3Sdk.SendSmtpEmail();
+    userEmail.sender = { name: 'Forge', email: process.env.ADMIN_EMAIL }; // Use env variable
+    userEmail.to = [{ email: businessEmail }];
+    userEmail.subject = 'Welcome to Our App!';
+    userEmail.htmlContent = `
+      <html>
+        <body style="font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+            <tr>
+              <td style="background-color: #4a90e2; padding: 20px; text-align: center; border-top-left-radius: 8px; border-top-right-radius: 8px;">
+                <h3 style="color: #ffffff; margin: 0; font-size: 24px;">Welcome, ${businessName}!</h3>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 20px; color: #333333;">
+                <p style="font-size: 16px; line-height: 1.5;">Thank you for creating an account with us! We’ve noticed your signup and will get back to you soon.</p>
+                <p style="font-size: 16px; line-height: 1.5;">Here’s to a great journey ahead!</p>
+                <p style="font-size: 14px; color: #777777; margin-top: 20px;">Best regards,<br><span style="color: #4a90e2; font-weight: bold;">Forge Academy</span></p>
+              </td>
+            </tr>
+            <tr>
+              <td style="background-color: #f4f4f4; padding: 10px; text-align: center; font-size: 12px; color: #999999; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;">
+                © ${new Date().getFullYear()} Forge. All rights reserved.
+              </td>
+            </tr>
+          </table>
+        </body>
+      </html>
+    `;
+
+    console.log("Preparing to send admin email");
+    const adminEmail = new SibApiV3Sdk.SendSmtpEmail();
+    adminEmail.sender = { name: 'Forge', email: process.env.ADMIN_EMAIL }; // Use env variable
+    adminEmail.to = [{ email: process.env.ADMIN_EMAIL }];
+    adminEmail.subject = 'New User Signup Notification';
+    adminEmail.htmlContent = `
+      <html>
+        <body style="font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+            <tr>
+              <td style="background-color: #e94e77; padding: 20px; text-align: center; border-top-left-radius: 8px; border-top-right-radius: 8px;">
+                <h3 style="color: #ffffff; margin: 0; font-size: 24px;">New User Alert</h3>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 20px; color: #333333;">
+                <p style="font-size: 16px; line-height: 1.5;">A new user has just signed up:</p>
+                <ul style="list-style-type: none; padding: 0; font-size: 16px; line-height: 1.6;">
+                  <li style="margin-bottom: 10px;"><strong>Business Name:</strong> ${businessName}</li>
+                  <li style="margin-bottom: 10px;"><strong>Email:</strong> ${businessEmail}</li>
+                  <li style="margin-bottom: 10px;"><strong>Address:</strong> ${address}</li>
+                  <li style="margin-bottom: 10px;"><strong>Contact Number:</strong> ${contactNumber}</li>
+                  <li style="margin-bottom: 10px;"><strong>Financial Year End:</strong> ${financialYearEnd}</li>
+                </ul>
+              </td>
+            </tr>
+            <tr>
+              <td style="background-color: #f4f4f4; padding: 10px; text-align: center; font-size: 12px; color: #999999; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;">
+                © ${new Date().getFullYear()} Forge. All rights reserved.
+              </td>
+            </tr>
+          </table>
+        </body>
+      </html>
+    `;
+
+    console.log("Sending emails via Brevo");
+    await apiInstance.sendTransacEmail(userEmail);
+    await apiInstance.sendTransacEmail(adminEmail);
+
+    console.log("Signup successful for UID:", user.uid);
     res.status(201).json({ 
-      message: "User created successfully", 
+      message: "User created successfully, emails sent", 
       uid: user.uid, 
       businessName, 
       financialYearEnd: dateObject 
     });
   } catch (error) {
-    console.error("Signup error:", error.code, error.message);
+    console.error("Signup error details:", { code: error.code, message: error.message, stack: error.stack });
     res.status(400).json({ error: error.message, code: error.code });
   }
 });
+
 
 // Login route
 app.post("/login", async (req, res) => {
@@ -111,7 +196,7 @@ app.get('/test', (req, res) => {
   res.status(200).json({ message: 'Test route working' });
 });
 
-// Management Control Table- creating the table
+// Management Control Table - Create
 app.post("/management-control", async (req, res) => {
   console.log("Management control POST hit with body:", req.body);
   const { userId, managers, managementData } = req.body;
@@ -170,9 +255,9 @@ app.post("/management-control", async (req, res) => {
   }
 });
 
-
 // Management Control - Retrieve
-app.get("/management-control/:userId", async (req, res) => {  const { userId } = req.params;
+app.get("/management-control/:userId", async (req, res) => {  
+  const { userId } = req.params;
 
   try {
     const managementRef = collection(db, "managementControl");
