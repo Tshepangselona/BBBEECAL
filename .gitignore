@@ -1,0 +1,21 @@
+# Environment variables
+.env
+frontend/.env
+backend/.env
+
+# Node.js dependencies
+node_modules/
+frontend/node_modules/
+backend/node_modules/
+
+# Vite build output (React frontend)
+frontend/dist/
+frontend/build/
+
+# Logs and temp files
+*.log
+*.cache
+
+# Optional: OS-specific files
+.DS_Store  # macOS
+Thumbs.db  # Windows
