@@ -1,10 +1,11 @@
-require('dotenv').config(); // Add this at the top
+require('dotenv').config();
 const express = require("express");
 const cors = require("cors");
 const { auth, db } = require("./firebase");
-const { createUserWithEmailAndPassword } = require("firebase/auth");
-const { doc, setDoc } = require("firebase/firestore");
+const { createUserWithEmailAndPassword, signInWithEmailAndPassword } = require("firebase/auth");
+const { doc, setDoc, getDoc } = require("firebase/firestore");
 const SibApiV3Sdk = require('sib-api-v3-sdk');
+
 
 const app = express();
 app.use(cors());
@@ -164,17 +165,24 @@ app.post("/signup", async (req, res) => {
 // Login route
 app.post("/login", async (req, res) => {
   const { businessEmail, password } = req.body;
+  console.log("Login request received:", { businessEmail, password: "****" }); // Hide password
 
   try {
+    console.log("Attempting Firebase login...");
     const userCredential = await signInWithEmailAndPassword(auth, businessEmail, password);
     const user = userCredential.user;
+    console.log("Firebase login successful, UID:", user.uid);
+
+    console.log("Fetching user data from Firestore...");
     const userDoc = await getDoc(doc(db, "users", user.uid));
     
     if (!userDoc.exists()) {
+      console.log("No user data found in Firestore for UID:", user.uid);
       return res.status(404).json({ error: "User data not found" });
     }
 
     const userData = userDoc.data();
+    console.log("User data fetched:", userData);
     res.status(200).json({ 
       message: "Login successful", 
       uid: user.uid, 
@@ -182,7 +190,7 @@ app.post("/login", async (req, res) => {
       financialYearEnd: userData.financialYearEnd 
     });
   } catch (error) {
-    console.error("Login error:", error.code, error.message);
+    console.error("Login error details:", { code: error.code, message: error.message, stack: error.stack });
     if (error.code === "auth/invalid-credential") {
       res.status(401).json({ error: "Invalid email or password" });
     } else {
@@ -190,6 +198,7 @@ app.post("/login", async (req, res) => {
     }
   }
 });
+
 
 // Test route to confirm server is working
 app.get('/test', (req, res) => {
