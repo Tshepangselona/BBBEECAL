@@ -16,6 +16,9 @@ frontend/build/
 *.log
 *.cache
 
+# Firebase service account key
+backend/serviceAccountKey.json
+
 # Optional: OS-specific files
 .DS_Store  # macOS
 Thumbs.db  # Windows
