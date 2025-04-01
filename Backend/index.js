@@ -130,7 +130,7 @@ app.post("/signup", async (req, res) => {
             </tr>
             <tr>
               <td style="background-color: #f4f4f4; padding: 10px; text-align: center; font-size: 12px; color: #999999; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;">
-                © ${new Date().getFullYear()} Forge. All rights reserved.
+                © ${new Date().getFullYear()} Forge. All rights reserveed .
               </td>
             </tr>
           </table>
