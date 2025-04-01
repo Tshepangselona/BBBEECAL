@@ -3,9 +3,16 @@ const express = require("express");
 const cors = require("cors");
 const { auth, db } = require("./firebase");
 const { createUserWithEmailAndPassword, signInWithEmailAndPassword } = require("firebase/auth");
-const { doc, setDoc, getDoc } = require("firebase/firestore");
+const { doc, setDoc, getDoc, collection, addDoc, query, where, getDocs } = require("firebase/firestore");
 const SibApiV3Sdk = require('sib-api-v3-sdk');
+const crypto = require("crypto");
+const admin = require("firebase-admin");
+const serviceAccount = require("./serviceAccountKey.json"); // Path to your saved key
 
+// Initialize Firebase Admin SDK
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
 
 const app = express();
 app.use(cors());
@@ -21,8 +28,13 @@ const PORT = process.env.PORT || 5000;
 // Configure Brevo API client
 const defaultClient = SibApiV3Sdk.ApiClient.instance;
 const apiKey = defaultClient.authentications['api-key'];
-apiKey.apiKey = process.env.BREVO_API_KEY; // Use env variable
+apiKey.apiKey = process.env.BREVO_API_KEY;
 const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
+
+// Function to generate a random password
+const generatePassword = () => {
+  return crypto.randomBytes(8).toString('hex');
+};
 
 const validateDateFormat = (dateStr) => {
   const regex = /^(\d{2})\/([A-Za-z]{3})\/(\d{4})$/;
@@ -43,7 +55,7 @@ const validateDateFormat = (dateStr) => {
 };
 
 app.post("/signup", async (req, res) => {
-  const { businessEmail, password, businessName, financialYearEnd, address, contactNumber } = req.body;
+  const { businessEmail, Sector, businessName, financialYearEnd, address, contactNumber } = req.body;
 
   console.log("Request body:", req.body);
 
@@ -63,9 +75,20 @@ app.post("/signup", async (req, res) => {
       return res.status(400).json({ error: "Invalid date value for Financial Year End" });
     }
 
+    // Generate a random password
+    const password = generatePassword();
+    console.log("Generated password:", password); // Should print a 16-char hex string
+    console.log("Type of password:", typeof password); // Should be "string"
+    console.log("Password length:", password.length); // Should be 16
+
+    if (!password || typeof password !== "string" || password.length < 6) {
+      throw new Error("Generated password is invalid (must be a string, at least 6 characters)");
+    }
+
     console.log("Creating Firebase user with:", { businessEmail, password });
     const userCredential = await createUserWithEmailAndPassword(auth, businessEmail, password);
     const user = userCredential.user;
+    console.log("User created with UID:", user.uid);
 
     console.log("Saving to Firestore for UID:", user.uid);
     await setDoc(doc(db, "users", user.uid), {
@@ -74,14 +97,19 @@ app.post("/signup", async (req, res) => {
       address,
       contactNumber,
       businessEmail,
+      sector: Sector,
       createdAt: new Date().toISOString(),
     });
 
+    // Generate password reset link
+    const resetLink = await admin.auth().generatePasswordResetLink(businessEmail);
+    console.log("Password reset link generated:", resetLink);
+
     console.log("Preparing to send user email to:", businessEmail);
     const userEmail = new SibApiV3Sdk.SendSmtpEmail();
-    userEmail.sender = { name: 'Forge', email: process.env.ADMIN_EMAIL }; // Use env variable
+    userEmail.sender = { name: 'Forge', email: process.env.ADMIN_EMAIL };
     userEmail.to = [{ email: businessEmail }];
-    userEmail.subject = 'Welcome to Our App!';
+    userEmail.subject = 'Welcome to Forge - Set Your Password';
     userEmail.htmlContent = `
       <html>
         <body style="font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4;">
@@ -93,8 +121,10 @@ app.post("/signup", async (req, res) => {
             </tr>
             <tr>
               <td style="padding: 20px; color: #333333;">
-                <p style="font-size: 16px; line-height: 1.5;">Thank you for creating an account with us! We’ve noticed your signup and will get back to you soon.</p>
-                <p style="font-size: 16px; line-height: 1.5;">Here’s to a great journey ahead!</p>
+                <p style="font-size: 16px; line-height: 1.5;">Your account has been created successfully!</p>
+                <p style="font-size: 16px; line-height: 1.5;">Email: ${businessEmail}</p>
+                <p style="font-size: 16px; line-height: 1.5;">Please click the link below to set your password:</p>
+                <p><a href="${resetLink}" style="color: #4a90e2; text-decoration: underline;">Set Your Password</a></p>
                 <p style="font-size: 14px; color: #777777; margin-top: 20px;">Best regards,<br><span style="color: #4a90e2; font-weight: bold;">Forge Academy</span></p>
               </td>
             </tr>
@@ -110,7 +140,7 @@ app.post("/signup", async (req, res) => {
 
     console.log("Preparing to send admin email");
     const adminEmail = new SibApiV3Sdk.SendSmtpEmail();
-    adminEmail.sender = { name: 'Forge', email: process.env.ADMIN_EMAIL }; // Use env variable
+    adminEmail.sender = { name: 'Forge', email: process.env.ADMIN_EMAIL };
     adminEmail.to = [{ email: process.env.ADMIN_EMAIL }];
     adminEmail.subject = 'New User Signup Notification';
     adminEmail.htmlContent = `
@@ -131,6 +161,7 @@ app.post("/signup", async (req, res) => {
                   <li style="margin-bottom: 10px;"><strong>Address:</strong> ${address}</li>
                   <li style="margin-bottom: 10px;"><strong>Contact Number:</strong> ${contactNumber}</li>
                   <li style="margin-bottom: 10px;"><strong>Financial Year End:</strong> ${financialYearEnd}</li>
+                  <li style="margin-bottom: 10px;"><strong>Sector:</strong> ${Sector}</li>
                 </ul>
               </td>
             </tr>
@@ -153,14 +184,14 @@ app.post("/signup", async (req, res) => {
       message: "User created successfully, emails sent", 
       uid: user.uid, 
       businessName, 
-      financialYearEnd: dateObject 
+      financialYearEnd: dateObject,
+      sector: Sector,
     });
   } catch (error) {
     console.error("Signup error details:", { code: error.code, message: error.message, stack: error.stack });
     res.status(400).json({ error: error.message, code: error.code });
   }
 });
-
 
 // Login route
 app.post("/login", async (req, res) => {
