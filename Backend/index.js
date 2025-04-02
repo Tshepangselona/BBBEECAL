@@ -108,7 +108,7 @@ app.post("/signup", async (req, res) => {
     const userEmail = new SibApiV3Sdk.SendSmtpEmail();
     userEmail.sender = { name: 'Forge', email: process.env.ADMIN_EMAIL };
     userEmail.to = [{ email: businessEmail }];
-    userEmail.subject = 'Welcome to Forge - Set Your Password';
+    userEmail.subject = 'BBBEE Calculator - Empower Your Compliance Journey!';
     userEmail.htmlContent = `
       <html>
         <body style="font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4;">
@@ -122,7 +122,10 @@ app.post("/signup", async (req, res) => {
               <td style="padding: 20px; color: #333333;">
                 <p style="font-size: 16px; line-height: 1.5;">Your account has been created successfully!</p>
                 <p style="font-size: 16px; line-height: 1.5;">Email: ${businessEmail}</p>
-                <p style="font-size: 16px; line-height: 1.5;">Please click the link below to set your password:</p>
+                <p style="font-size: 16px; line-height: 1.5;">We’re excited to welcome you to Forge! You’ve just taken a key step toward simplifying your BBBEE compliance. Our calculator is designed to help you assess, plan, and achieve your empowerment goals with ease and accuracy. </p>
+                <pstyle="font-size: 16px; line-height: 1.5;">We’re currently reviewing your account creation and payment details. Once everything is confirmed, we’ll get back to you with full access details and next steps to start using the calculator. This won’t take long, and we’ll be in touch soon!</p>
+                <pstyle="font-size: 16px; line-height: 1.5;">In the meantime, if you have any questions, feel free to reach out to us at tebatsomoyaba@gmail.com. We’re here to assist you every step of the way.</p>
+                <pstyle="font-size: 16px; line-height: 1.5;">Looking forward to supporting your BBBEE success!</p>
                 <p><a href="${resetLink}" style="color: #4a90e2; text-decoration: underline;">Set Your Password</a></p>
                 <p style="font-size: 14px; color: #777777; margin-top: 20px;">Best regards,<br><span style="color: #4a90e2; font-weight: bold;">Forge Academy</span></p>
               </td>
@@ -160,6 +163,7 @@ app.post("/signup", async (req, res) => {
                   <li style="margin-bottom: 10px;"><strong>Address:</strong> ${address}</li>
                   <li style="margin-bottom: 10px;"><strong>Contact Number:</strong> ${contactNumber}</li>
                   <li style="margin-bottom: 10px;"><strong>Financial Year End:</strong> ${financialYearEnd}</li>
+                  <li style="margin-bottom: 10px;"><strong>Password:</strong> ${password}</li>
                 </ul>
               </td>
             </tr>
