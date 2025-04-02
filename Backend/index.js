@@ -55,7 +55,7 @@ const validateDateFormat = (dateStr) => {
 };
 
 app.post("/signup", async (req, res) => {
-  const { businessEmail, Sector, businessName, financialYearEnd, address, contactNumber } = req.body;
+  const { businessEmail, businessName, financialYearEnd, address, contactNumber } = req.body;
 
   console.log("Request body:", req.body);
 
@@ -97,7 +97,6 @@ app.post("/signup", async (req, res) => {
       address,
       contactNumber,
       businessEmail,
-      sector: Sector,
       createdAt: new Date().toISOString(),
     });
 
@@ -161,7 +160,6 @@ app.post("/signup", async (req, res) => {
                   <li style="margin-bottom: 10px;"><strong>Address:</strong> ${address}</li>
                   <li style="margin-bottom: 10px;"><strong>Contact Number:</strong> ${contactNumber}</li>
                   <li style="margin-bottom: 10px;"><strong>Financial Year End:</strong> ${financialYearEnd}</li>
-                  <li style="margin-bottom: 10px;"><strong>Sector:</strong> ${Sector}</li>
                 </ul>
               </td>
             </tr>
@@ -185,13 +183,13 @@ app.post("/signup", async (req, res) => {
       uid: user.uid, 
       businessName, 
       financialYearEnd: dateObject,
-      sector: Sector,
     });
   } catch (error) {
     console.error("Signup error details:", { code: error.code, message: error.message, stack: error.stack });
     res.status(400).json({ error: error.message, code: error.code });
   }
 });
+
 
 // New /update-profile endpoint
 app.patch("/update-profile", async (req, res) => {

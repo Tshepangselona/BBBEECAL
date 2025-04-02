@@ -4,7 +4,6 @@ import { Link, useNavigate } from "react-router-dom";
 export default function SignUp() {
   const [formData, setFormData] = useState({
     businessEmail: "",
-    Sector: "",
     businessName: "",
     financialYearEnd: "",
     address: "",
@@ -39,15 +38,12 @@ export default function SignUp() {
     if (!phoneRegex.test(formData.contactNumber)) {
       return "Contact number must be 10-15 digits (e.g., +27123456789)";
     }
-    if (!formData.Sector) {
-      return "Please select a sector";
-    }
-    return "";
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     console.log("Submit clicked!", formData);
+    console.log("Form data being sent:", JSON.stringify(formData));
     setError("");
     setSuccess("");
     setLoading(true);
@@ -81,7 +77,6 @@ export default function SignUp() {
         uid: data.uid,
         businessName: data.businessName,
         financialYearEnd: data.financialYearEnd,
-        sector: data.sector,
         address: data.address,
         contactNumber: data.contactNumber,
       };
@@ -169,23 +164,6 @@ export default function SignUp() {
             required
             disabled={loading}
           />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Sector</label>
-          <select
-            name="Sector"
-            value={formData.Sector}
-            onChange={handleChange}
-            className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-600"
-            required
-            disabled={loading}
-          >
-            <option value="">Select Sector</option>
-            <option value="Generic">Generic</option>
-            <option value="Tourism">Tourism</option>
-            <option value="Construction">Construction</option>
-            <option value="ICT">ICT</option>
-          </select>
         </div>
         <button
           type="submit"
