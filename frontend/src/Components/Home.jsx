@@ -33,6 +33,8 @@ const Home = () => {
     totalMeasuredProcurementSpend: 0,
   });
 
+  const [originalData, setOriginalData] = useState({ companyName: '', sector: '' });
+  const [isDirty, setIsDirty] = useState(false);
   const [userId, setUserId] = useState(null);
   const [showOwnershipModal, setShowOwnershipModal] = useState(false);
   const [showManagementModal, setShowManagementModal] = useState(false);
@@ -55,81 +57,146 @@ const Home = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Function to format Firestore Timestamp (serialized or native) to DD/MMM/YYYY
+  // Format Firestore Timestamp to DD/MMM/YYYY
   const formatDate = (timestamp) => {
     if (!timestamp) return "";
     try {
       let date;
       if (timestamp.seconds !== undefined && timestamp.nanoseconds !== undefined) {
-        console.log("Processing serialized timestamp:", timestamp);
         date = new Date(timestamp.seconds * 1000);
-        console.log("Created Date object:", date, "Timestamp in ms:", timestamp.seconds * 1000);
       } else if (timestamp.toDate) {
-        console.log("Processing native Firestore Timestamp:", timestamp);
         date = timestamp.toDate();
       } else {
-        console.log("Processing fallback timestamp:", timestamp);
         date = new Date(timestamp);
       }
-
-      console.log("Date after creation:", date);
-      if (isNaN(date.getTime())) {
-        console.error("Date is invalid, getTime():", date.getTime());
-        throw new Error("Invalid date");
-      }
-
+      if (isNaN(date.getTime())) throw new Error("Invalid date");
       const day = String(date.getDate()).padStart(2, "0");
       const month = date.toLocaleString("default", { month: "short" });
       const year = date.getFullYear();
-      console.log("Formatted components:", { day, month, year });
       return `${day}/${month}/${year}`;
     } catch (err) {
-      console.error("Error formatting date:", err, "Timestamp:", timestamp);
+      console.error("Error formatting date:", err);
       return "Invalid Date";
     }
   };
 
-  // Load data from navigation state
-  useEffect(() => {
-    const userData = location.state?.userData;
-    console.log("Raw userData:", userData);
+// Add this function inside Home component
+const fetchUserProfile = async (uid) => {
+  try {
+    const response = await fetch(`http://localhost:5000/get-profile?uid=${uid}`);
+    if (!response.ok) throw new Error(`Failed to fetch profile: ${response.statusText}`);
+    const data = await response.json();
+    setFinancialData((prevData) => ({
+      ...prevData,
+      companyName: data.businessName || prevData.companyName,
+      yearEnd: data.financialYearEnd ? formatDate(data.financialYearEnd) : prevData.yearEnd,
+      sector: data.sector || prevData.sector,
+    }));
+    setOriginalData({
+      companyName: data.businessName || financialData.companyName,
+      sector: data.sector || financialData.sector,
+    });
+  } catch (err) {
+    console.error("Fetch profile error:", err);
+    setError("Failed to fetch profile data from server");
+  }
+};
 
-    if (!userData || !userData.uid) {
-      console.log("No user data or UID found, redirecting to Login");
-      navigate("/Login", { replace: true });
-      return;
-    }
+// Update useEffect
+useEffect(() => {
+  const userData = location.state?.userData;
+  console.log("Raw userData:", userData);
 
+  if (!userData || !userData.uid) {
+    console.log("No user data or UID found, redirecting to Login");
+    setError("User data not provided. Please log in.");
+    setLoading(false);
+    navigate("/Login", { replace: true });
+    return;
+  }
+
+  const initializeData = async () => {
     try {
       setUserId(userData.uid);
       const formattedYearEnd = userData.financialYearEnd
         ? formatDate(userData.financialYearEnd)
         : "";
-      console.log("Formatted yearEnd:", formattedYearEnd);
-      setFinancialData((prevData) => {
-        const updatedData = {
-          ...prevData,
-          companyName: userData.businessName || prevData.companyName,
-          yearEnd: formattedYearEnd || prevData.yearEnd,
-          sector: userData.sector || '',
-        };
-        console.log("Updated financialData:", updatedData);
-        return updatedData;
-      });
+      const initialData = {
+        companyName: userData.businessName || '',
+        yearEnd: formattedYearEnd || '',
+        sector: userData.sector || '',
+      };
+      setFinancialData((prevData) => ({
+        ...prevData,
+        ...initialData,
+        turnover: prevData.turnover,
+        npbt: prevData.npbt,
+        npat: prevData.npat,
+        salaries: prevData.salaries,
+        wages: prevData.wages,
+        directorsEmoluments: prevData.directorsEmoluments,
+        annualPayroll: prevData.annualPayroll,
+        expenses: prevData.expenses,
+        costOfSales: prevData.costOfSales,
+        depreciation: prevData.depreciation,
+        sdlPayments: prevData.sdlPayments,
+        totalLeviableAmount: prevData.totalLeviableAmount,
+        totalMeasuredProcurementSpend: prevData.totalMeasuredProcurementSpend,
+      }));
+      setOriginalData({ companyName: initialData.companyName, sector: initialData.sector });
+
+      // Fetch additional profile data
+      await fetchUserProfile(userData.uid);
     } catch (err) {
+      console.error("Error processing data:", err);
       setError("Failed to load company data");
-      console.error("Error in useEffect:", err);
     } finally {
       setLoading(false);
     }
-  }, [location, navigate]);
+  };
+
+  initializeData();
+}, [location, navigate]);
+
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFinancialData((prevData) => ({
-      ...prevData,
-      [name]: name === "yearEnd" || name === "sector" ? value : Number(value) || 0,
-    }));
+    setFinancialData((prevData) => {
+      const newData = {
+        ...prevData,
+        [name]: name === "yearEnd" || name === "sector" ? value : Number(value) || 0,
+      };
+      setIsDirty(
+        newData.companyName !== originalData.companyName ||
+        newData.sector !== originalData.sector
+      );
+      return newData;
+    });
+  };
+
+  const handleSave = async () => {
+    try {
+      const res = await fetch("http://localhost:5000/update-profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          uid: userId,
+          businessName: financialData.companyName,
+          sector: financialData.sector,
+        }),
+      });
+      if (!res.ok) throw new Error(`Failed to save changes: ${res.statusText}`);
+      const updatedData = await res.json();
+      setOriginalData({
+        companyName: financialData.companyName,
+        sector: financialData.sector,
+      });
+      setIsDirty(false);
+      console.log("Profile updated:", updatedData);
+    } catch (err) {
+      console.error("Error saving profile:", err);
+      setError("Failed to save changes");
+    }
   };
 
   const handleOwnershipSubmit = (data) => {
@@ -178,10 +245,10 @@ const Home = () => {
       ownership: { weight: 25, target: 0.25 },
       managementControl: { weight: 19, target: 0.5 },
       skillsDevelopment: { weight: 20, target: 0.06 },
-      esd: { weight: 30, targetSupplier: 0.1, targetEnterprise: 0.01 }, // Combined ESD
+      esd: { weight: 30, targetSupplier: 0.1, targetEnterprise: 0.01 },
       socioEconomicDevelopment: { weight: 5, target: 0.01 },
       yesBonus: { weight: 5 },
-      totalWeight: 99, // Excluding YES bonus
+      totalWeight: 99,
     },
     Tourism: {
       ownership: { weight: 27, target: 0.3 },
@@ -219,18 +286,16 @@ const Home = () => {
     let ownershipScore = 0;
     let managementControlScore = 0;
     let skillsDevelopmentScore = 0;
-    let esdScore = 0; // Combined ESD score
+    let esdScore = 0;
     let socioEconomicDevelopmentScore = 0;
     let yesBonusPoints = 0;
 
-    // Ownership Score
     if (ownershipDetails?.ownershipData) {
       const blackOwnership = ownershipDetails.ownershipData.blackOwnershipPercentage || 0;
       const ownershipRatio = blackOwnership / 100 / scorecard.ownership.target;
       ownershipScore = Math.min(ownershipRatio * scorecard.ownership.weight, scorecard.ownership.weight);
     }
 
-    // Management Control Score
     if (managementDetails?.managementData) {
       const blackVotingRights = managementDetails.managementData.blackVotingRights || 0;
       const blackEconomicInterest = managementDetails.managementData.blackEconomicInterest || 0;
@@ -239,7 +304,6 @@ const Home = () => {
       managementControlScore = Math.min(managementRatio * scorecard.managementControl.weight, scorecard.managementControl.weight);
     }
 
-    // Skills Development Score
     if (skillsDevelopmentDetails?.summary) {
       const totalExpenditure = skillsDevelopmentDetails.summary.totalDirectExpenditure || 0;
       const targetSpend = financialData.totalLeviableAmount * scorecard.skillsDevelopment.target;
@@ -247,14 +311,12 @@ const Home = () => {
       skillsDevelopmentScore = Math.min(expenditureRatio * scorecard.skillsDevelopment.weight, scorecard.skillsDevelopment.weight);
     }
 
-    // Combined ESD Score (Enterprise and Supplier Development)
     let supplierDevelopmentScore = 0;
     let enterpriseDevelopmentScore = 0;
     const esdWeight = scorecard.esd.weight;
-    const supplierWeight = esdWeight / 2; // Split the weight equally for simplicity
+    const supplierWeight = esdWeight / 2;
     const enterpriseWeight = esdWeight / 2;
 
-    // Supplier Development Component
     if (supplierDevelopmentDetails?.localSummary) {
       const totalProcurementSpend = financialData.totalMeasuredProcurementSpend || 1;
       const blackOwnedSpend = supplierDevelopmentDetails.localSummary.totalExpenditure * 
@@ -264,7 +326,6 @@ const Home = () => {
       supplierDevelopmentScore = Math.min(spendRatio * supplierWeight, supplierWeight);
     }
 
-    // Enterprise Development Component
     if (enterpriseDevelopmentDetails?.summary) {
       const totalContribution = enterpriseDevelopmentDetails.summary.totalContribution || 0;
       const targetContribution = financialData.npat * scorecard.esd.targetEnterprise;
@@ -272,10 +333,8 @@ const Home = () => {
       enterpriseDevelopmentScore = Math.min(contributionRatio * enterpriseWeight, enterpriseWeight);
     }
 
-    // Combine into ESD Score
     esdScore = supplierDevelopmentScore + enterpriseDevelopmentScore;
 
-    // Socio-Economic Development Score
     if (socioEconomicDevelopmentDetails?.summary) {
       const totalContribution = socioEconomicDevelopmentDetails.summary.totalContribution || 0;
       const targetContribution = financialData.npat * scorecard.socioEconomicDevelopment.target;
@@ -283,13 +342,11 @@ const Home = () => {
       socioEconomicDevelopmentScore = Math.min(contributionRatio * scorecard.socioEconomicDevelopment.weight, scorecard.socioEconomicDevelopment.weight);
     }
 
-    // YES 4 Youth Bonus Points
     if (yesDetails?.yesData) {
       const participants = yesDetails.yesData.totalParticipants || 0;
       yesBonusPoints = Math.min(participants * 1, scorecard.yesBonus.weight);
     }
 
-    // Total Score
     const totalScore = (
       ownershipScore +
       managementControlScore +
@@ -299,7 +356,6 @@ const Home = () => {
       yesBonusPoints
     );
 
-    // Determine B-BBEE Level and Status
     let bbeeLevel = "Non-compliant";
     let bbeeStatus = "0%";
     const maxScore = scorecard.totalWeight + scorecard.yesBonus.weight;
@@ -329,7 +385,6 @@ const Home = () => {
       bbeeStatus = "10%";
     }
 
-    // Set results
     setResults({
       sector,
       ownershipScore,
@@ -398,10 +453,11 @@ const Home = () => {
               type="text"
               name="companyName"
               value={financialData.companyName}
-              className="w-full p-2 border rounded bg-gray-100"
-              disabled
+              onChange={handleInputChange}
+              className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-600"
             />
           </div>
+
           <div>
             <label className="block text-sm font-medium mb-1">Financial Year End</label>
             <input
@@ -410,7 +466,7 @@ const Home = () => {
               value={financialData.yearEnd}
               onChange={handleInputChange}
               placeholder="e.g., 31/Mar/2025"
-              className="w-full p-2 border rounded"
+              className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-600"
             />
           </div>
           <div>
@@ -419,7 +475,7 @@ const Home = () => {
               name="sector"
               value={financialData.sector}
               onChange={handleInputChange}
-              className="w-full p-2 border rounded"
+              className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-600"
             >
               <option value="">Select Sector</option>
               <option value="Generic">Generic</option>
@@ -429,6 +485,16 @@ const Home = () => {
             </select>
           </div>
         </div>
+        {isDirty && (
+          <div className="mt-4 flex justify-end">
+            <button
+              onClick={handleSave}
+              className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
+            >
+              Save Changes
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Financial Information */}
@@ -698,10 +764,9 @@ const Home = () => {
           onSubmit={handleEnterpriseDevelopmentSubmit}
         />
       )}
-      
       {showSocioEconomicDevelopmentModal && (
         <SocioEconomicDevelopment
-          userId={userId} // Pass userId here
+          userId={userId}
           onClose={() => setShowSocioEconomicDevelopmentModal(false)}
           onSubmit={handleSocioEconomicDevelopmentSubmit}
         />

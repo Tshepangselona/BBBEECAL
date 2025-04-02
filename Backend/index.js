@@ -3,11 +3,6 @@ const express = require("express");
 const cors = require("cors");
 const { auth, db } = require("./firebase");
 const { createUserWithEmailAndPassword, signInWithEmailAndPassword } = require("firebase/auth");
-<<<<<<< HEAD
-const { doc, setDoc, getDoc } = require("firebase/firestore");
-const SibApiV3Sdk = require('sib-api-v3-sdk');
-
-=======
 const { doc, setDoc, getDoc, collection, addDoc, query, where, getDocs } = require("firebase/firestore");
 const SibApiV3Sdk = require('sib-api-v3-sdk');
 const crypto = require("crypto");
@@ -18,7 +13,6 @@ const serviceAccount = require("./serviceAccountKey.json"); // Path to your save
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
->>>>>>> 4de07a1c5a1cfd0fb674a80b72a57e6384a0e03d
 
 const app = express();
 app.use(cors());
@@ -34,11 +28,6 @@ const PORT = process.env.PORT || 5000;
 // Configure Brevo API client
 const defaultClient = SibApiV3Sdk.ApiClient.instance;
 const apiKey = defaultClient.authentications['api-key'];
-<<<<<<< HEAD
-apiKey.apiKey = process.env.BREVO_API_KEY; // Use env variable
-const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
-
-=======
 apiKey.apiKey = process.env.BREVO_API_KEY;
 const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
 
@@ -47,7 +36,6 @@ const generatePassword = () => {
   return crypto.randomBytes(8).toString('hex');
 };
 
->>>>>>> 4de07a1c5a1cfd0fb674a80b72a57e6384a0e03d
 const validateDateFormat = (dateStr) => {
   const regex = /^(\d{2})\/([A-Za-z]{3})\/(\d{4})$/;
   if (!regex.test(dateStr)) return false;
@@ -67,11 +55,7 @@ const validateDateFormat = (dateStr) => {
 };
 
 app.post("/signup", async (req, res) => {
-<<<<<<< HEAD
-  const { businessEmail, password, businessName, financialYearEnd, address, contactNumber } = req.body;
-=======
   const { businessEmail, Sector, businessName, financialYearEnd, address, contactNumber } = req.body;
->>>>>>> 4de07a1c5a1cfd0fb674a80b72a57e6384a0e03d
 
   console.log("Request body:", req.body);
 
@@ -91,19 +75,16 @@ app.post("/signup", async (req, res) => {
       return res.status(400).json({ error: "Invalid date value for Financial Year End" });
     }
 
-<<<<<<< HEAD
-=======
     // Generate a random password
     const password = generatePassword();
-    console.log("Generated password:", password); // Should print a 16-char hex string
-    console.log("Type of password:", typeof password); // Should be "string"
-    console.log("Password length:", password.length); // Should be 16
+    console.log("Generated password:", password);
+    console.log("Type of password:", typeof password);
+    console.log("Password length:", password.length);
 
     if (!password || typeof password !== "string" || password.length < 6) {
       throw new Error("Generated password is invalid (must be a string, at least 6 characters)");
     }
 
->>>>>>> 4de07a1c5a1cfd0fb674a80b72a57e6384a0e03d
     console.log("Creating Firebase user with:", { businessEmail, password });
     const userCredential = await createUserWithEmailAndPassword(auth, businessEmail, password);
     const user = userCredential.user;
@@ -120,13 +101,6 @@ app.post("/signup", async (req, res) => {
       createdAt: new Date().toISOString(),
     });
 
-<<<<<<< HEAD
-    console.log("Preparing to send user email to:", businessEmail);
-    const userEmail = new SibApiV3Sdk.SendSmtpEmail();
-    userEmail.sender = { name: 'Forge', email: process.env.ADMIN_EMAIL }; // Use env variable
-    userEmail.to = [{ email: businessEmail }];
-    userEmail.subject = 'Welcome to Our App!';
-=======
     // Generate password reset link
     const resetLink = await admin.auth().generatePasswordResetLink(businessEmail);
     console.log("Password reset link generated:", resetLink);
@@ -136,7 +110,6 @@ app.post("/signup", async (req, res) => {
     userEmail.sender = { name: 'Forge', email: process.env.ADMIN_EMAIL };
     userEmail.to = [{ email: businessEmail }];
     userEmail.subject = 'Welcome to Forge - Set Your Password';
->>>>>>> 4de07a1c5a1cfd0fb674a80b72a57e6384a0e03d
     userEmail.htmlContent = `
       <html>
         <body style="font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4;">
@@ -148,25 +121,16 @@ app.post("/signup", async (req, res) => {
             </tr>
             <tr>
               <td style="padding: 20px; color: #333333;">
-<<<<<<< HEAD
-                <p style="font-size: 16px; line-height: 1.5;">Thank you for creating an account with us! We’ve noticed your signup and will get back to you soon.</p>
-                <p style="font-size: 16px; line-height: 1.5;">Here’s to a great journey ahead!</p>
-=======
                 <p style="font-size: 16px; line-height: 1.5;">Your account has been created successfully!</p>
                 <p style="font-size: 16px; line-height: 1.5;">Email: ${businessEmail}</p>
                 <p style="font-size: 16px; line-height: 1.5;">Please click the link below to set your password:</p>
                 <p><a href="${resetLink}" style="color: #4a90e2; text-decoration: underline;">Set Your Password</a></p>
->>>>>>> 4de07a1c5a1cfd0fb674a80b72a57e6384a0e03d
                 <p style="font-size: 14px; color: #777777; margin-top: 20px;">Best regards,<br><span style="color: #4a90e2; font-weight: bold;">Forge Academy</span></p>
               </td>
             </tr>
             <tr>
               <td style="background-color: #f4f4f4; padding: 10px; text-align: center; font-size: 12px; color: #999999; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;">
-<<<<<<< HEAD
-                © ${new Date().getFullYear()} Forge. All rights reserved.
-=======
                 © ${new Date().getFullYear()} Forge. All rights reserved .
->>>>>>> 4de07a1c5a1cfd0fb674a80b72a57e6384a0e03d
               </td>
             </tr>
           </table>
@@ -176,11 +140,7 @@ app.post("/signup", async (req, res) => {
 
     console.log("Preparing to send admin email");
     const adminEmail = new SibApiV3Sdk.SendSmtpEmail();
-<<<<<<< HEAD
-    adminEmail.sender = { name: 'Forge', email: process.env.ADMIN_EMAIL }; // Use env variable
-=======
     adminEmail.sender = { name: 'Forge', email: process.env.ADMIN_EMAIL };
->>>>>>> 4de07a1c5a1cfd0fb674a80b72a57e6384a0e03d
     adminEmail.to = [{ email: process.env.ADMIN_EMAIL }];
     adminEmail.subject = 'New User Signup Notification';
     adminEmail.htmlContent = `
@@ -201,10 +161,7 @@ app.post("/signup", async (req, res) => {
                   <li style="margin-bottom: 10px;"><strong>Address:</strong> ${address}</li>
                   <li style="margin-bottom: 10px;"><strong>Contact Number:</strong> ${contactNumber}</li>
                   <li style="margin-bottom: 10px;"><strong>Financial Year End:</strong> ${financialYearEnd}</li>
-<<<<<<< HEAD
-=======
                   <li style="margin-bottom: 10px;"><strong>Sector:</strong> ${Sector}</li>
->>>>>>> 4de07a1c5a1cfd0fb674a80b72a57e6384a0e03d
                 </ul>
               </td>
             </tr>
@@ -227,12 +184,8 @@ app.post("/signup", async (req, res) => {
       message: "User created successfully, emails sent", 
       uid: user.uid, 
       businessName, 
-<<<<<<< HEAD
-      financialYearEnd: dateObject 
-=======
       financialYearEnd: dateObject,
       sector: Sector,
->>>>>>> 4de07a1c5a1cfd0fb674a80b72a57e6384a0e03d
     });
   } catch (error) {
     console.error("Signup error details:", { code: error.code, message: error.message, stack: error.stack });
@@ -240,10 +193,27 @@ app.post("/signup", async (req, res) => {
   }
 });
 
-<<<<<<< HEAD
+// New /update-profile endpoint
+app.patch("/update-profile", async (req, res) => {
+  const { uid, businessName, sector } = req.body;
+  console.log("Update profile request:", { uid, businessName, sector });
 
-=======
->>>>>>> 4de07a1c5a1cfd0fb674a80b72a57e6384a0e03d
+  try {
+    if (!uid) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
+    if (!businessName || !sector) {
+      return res.status(400).json({ error: "Business name and sector are required" });
+    }
+
+    await setDoc(doc(db, "users", uid), { businessName, sector }, { merge: true });
+    res.status(200).json({ message: "Profile updated", businessName, sector });
+  } catch (error) {
+    console.error("Update error:", error);
+    res.status(500).json({ error: "Failed to update profile" });
+  }
+});
+
 // Login route
 app.post("/login", async (req, res) => {
   const { businessEmail, password } = req.body;
@@ -280,7 +250,6 @@ app.post("/login", async (req, res) => {
     }
   }
 });
-
 
 // Test route to confirm server is working
 app.get('/test', (req, res) => {
@@ -538,7 +507,6 @@ app.post("/yes4youth-initiative", async (req, res) => {
     res.status(400).json({ error: error.message, code: error.code });
   }
 });
-
 // Yes 4 Youth Initiative - Retrieve
 app.get("/yes4youth-initiative/:userId", async (req, res) => {
   const { userId } = req.params;
@@ -988,6 +956,40 @@ app.get("/socio-economic-development/:userId", async (req, res) => {
   } catch (error) {
     console.error("Socio-economic development retrieval error:", error.code, error.message);
     res.status(500).json({ error: error.message, code: error.code });
+  }
+});
+
+// New /get-profile endpoint
+app.get("/get-profile", async (req, res) => {
+  const { uid } = req.query;
+  console.log("Get profile request for UID:", uid);
+
+  try {
+    if (!uid) {
+      console.log("Missing UID in request");
+      return res.status(400).json({ error: "User ID is required" });
+    }
+
+    const userDoc = await getDoc(doc(db, "users", uid));
+    if (!userDoc.exists()) {
+      console.log("User not found for UID:", uid);
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const data = userDoc.data();
+    console.log("Profile data retrieved:", data);
+
+    res.status(200).json({
+      businessName: data.businessName || '',
+      sector: data.sector || '',
+      financialYearEnd: data.financialYearEnd || null,
+      address: data.address || '',
+      contactNumber: data.contactNumber || '',
+      businessEmail: data.businessEmail || '',
+    });
+  } catch (error) {
+    console.error("Get profile error:", error.code, error.message);
+    res.status(500).json({ error: "Failed to fetch profile", code: error.code });
   }
 });
 
