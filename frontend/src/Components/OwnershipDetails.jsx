@@ -59,16 +59,18 @@ const OwnershipDetails = ({ userId, onClose, onSubmit }) => {
     netValue: 0,
   });
 
-  // Fetch existing data when component mounts (optional)
+  const [editingParticipantIndex, setEditingParticipantIndex] = useState(null);
+  const [editingEntityIndex, setEditingEntityIndex] = useState(null);
+
   useEffect(() => {
     const fetchOwnershipData = async () => {
       try {
         const response = await axios.get(`http://localhost:5000/ownership-details/${userId}`);
         const records = response.data.data;
         if (records.length > 0) {
-          setParticipants(records[0].participants); // Load the first record's participants
-          setEntities(records[0].entities); // Load the first record's entities
-          setOwnershipData(records[0].ownershipData); // Load the first record's ownershipData
+          setParticipants(records[0].participants);
+          setEntities(records[0].entities);
+          setOwnershipData(records[0].ownershipData);
         }
       } catch (error) {
         console.error("Error fetching ownership details:", error);
@@ -109,15 +111,56 @@ const OwnershipDetails = ({ userId, onClose, onSubmit }) => {
       votingRights: 0,
       outstandingDebt: 0,
     });
-
     recalculateOwnershipData([...participants, newParticipant]);
+  };
+
+  const deleteParticipant = (index) => {
+    const updatedParticipants = participants.filter((_, i) => i !== index);
+    setParticipants(updatedParticipants);
+    recalculateOwnershipData(updatedParticipants);
+  };
+
+  const editParticipant = (index) => {
+    setEditingParticipantIndex(index);
+    setNewParticipant(participants[index]);
+  };
+
+  const saveEditedParticipant = () => {
+    if (!newParticipant.name || !newParticipant.idNumber) {
+      alert("Please fill in the Name and ID Number.");
+      return;
+    }
+
+    const updatedParticipants = participants.map((participant, index) =>
+      index === editingParticipantIndex ? newParticipant : participant
+    );
+    setParticipants(updatedParticipants);
+    setEditingParticipantIndex(null);
+    setNewParticipant({
+      name: "",
+      idNumber: "",
+      race: "",
+      gender: "",
+      isForeign: false,
+      isNewEntrant: false,
+      designatedGroups: false,
+      isYouth: false,
+      isDisabled: false,
+      isUnemployed: false,
+      isLivingInRuralAreas: false,
+      isMilitaryVeteran: false,
+      economicInterest: 0,
+      votingRights: 0,
+      outstandingDebt: 0,
+    });
+    recalculateOwnershipData(updatedParticipants);
   };
 
   const handleEntityChange = (e) => {
     const { name, value, type, checked } = e.target;
     setNewEntity({
       ...newEntity,
-      [name]: type === "checkbox" ? checked : value, // Keep as string initially, convert to number in addEntity
+      [name]: type === "checkbox" ? checked : value,
     });
   };
 
@@ -167,8 +210,71 @@ const OwnershipDetails = ({ userId, onClose, onSubmit }) => {
       coOps: 0,
       outstandingDebtByBlackParticipants: 0,
     });
-
     recalculateOwnershipDataFromEntities([...entities, updatedEntity]);
+  };
+
+  const deleteEntity = (index) => {
+    const updatedEntities = entities.filter((_, i) => i !== index);
+    setEntities(updatedEntities);
+    recalculateOwnershipDataFromEntities(updatedEntities);
+  };
+
+  const editEntity = (index) => {
+    setEditingEntityIndex(index);
+    setNewEntity(entities[index]);
+  };
+
+  const saveEditedEntity = () => {
+    if (!newEntity.entityName || !newEntity.tier) {
+      alert("Please fill in the Entity Name and Tier.");
+      return;
+    }
+
+    const updatedEntity = {
+      ...newEntity,
+      ownershipInNextTier: Number(newEntity.ownershipInNextTier) || 0,
+      totalBlackVotingRights: Number(newEntity.totalBlackVotingRights) || 0,
+      blackWomenVotingRights: Number(newEntity.blackWomenVotingRights) || 0,
+      totalBlackEconomicInterest: Number(newEntity.totalBlackEconomicInterest) || 0,
+      blackWomenEconomicInterest: Number(newEntity.blackWomenEconomicInterest) || 0,
+      newEntrants: Number(newEntity.newEntrants) || 0,
+      designatedGroups: Number(newEntity.designatedGroups) || 0,
+      youth: Number(newEntity.youth) || 0,
+      disabled: Number(newEntity.disabled) || 0,
+      unemployed: Number(newEntity.unemployed) || 0,
+      livingInRuralAreas: Number(newEntity.livingInRuralAreas) || 0,
+      militaryVeteran: Number(newEntity.militaryVeteran) || 0,
+      esopBbos: Number(newEntity.esopBbos) || 0,
+      coOps: Number(newEntity.coOps) || 0,
+      outstandingDebtByBlackParticipants: Number(newEntity.outstandingDebtByBlackParticipants) || 0,
+    };
+
+    const updatedEntities = entities.map((entity, index) =>
+      index === editingEntityIndex ? updatedEntity : entity
+    );
+    setEntities(updatedEntities);
+    setEditingEntityIndex(null);
+    setNewEntity({
+      tier: "",
+      entityName: "",
+      ownershipInNextTier: 0,
+      modifiedFlowThroughApplied: false,
+      totalBlackVotingRights: 0,
+      blackWomenVotingRights: 0,
+      totalBlackEconomicInterest: 0,
+      blackWomenEconomicInterest: 0,
+      newEntrants: 0,
+      designatedGroups: 0,
+      youth: 0,
+      disabled: 0,
+      unemployed: 0,
+      livingInRuralAreas: 0,
+      militaryVeteran: 0,
+      esopBbos: 0,
+      coOps: 0,
+      outstandingDebtByBlackParticipants: 0,
+    });
+    recalculateOwnershipDataFromEntities(updatedEntities);
   };
 
   const recalculateOwnershipData = (updatedParticipants) => {
@@ -282,7 +388,7 @@ const OwnershipDetails = ({ userId, onClose, onSubmit }) => {
       const payload = { userId, participants, entities, ownershipData };
       const response = await axios.post("http://localhost:5000/ownership-details", payload);
       console.log("Ownership details data saved:", response.data);
-      onSubmit(payload); // Optional: Pass data to parent component
+      onSubmit(payload);
       onClose();
     } catch (error) {
       console.error("Error saving ownership details:", error.message, error.response?.data);
@@ -296,7 +402,7 @@ const OwnershipDetails = ({ userId, onClose, onSubmit }) => {
         <h2 className="text-xl font-semibold mb-4">Ownership Details</h2>
 
         <form onSubmit={handleSubmit}>
-          {/* Participant Input Form (First Table) */}
+          {/* Participant Input Form */}
           <div className="mb-6">
             <h3 className="text-lg font-medium mb-2">Add Participant</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -468,14 +574,14 @@ const OwnershipDetails = ({ userId, onClose, onSubmit }) => {
             </div>
             <button
               type="button"
-              onClick={addParticipant}
+              onClick={editingParticipantIndex !== null ? saveEditedParticipant : addParticipant}
               className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
             >
-              Add Participant
+              {editingParticipantIndex !== null ? "Save Edited Participant" : "Add Participant"}
             </button>
           </div>
 
-          {/* Participants Table (First Table) */}
+          {/* Participants Table */}
           {participants.length > 0 && (
             <div className="mb-6">
               <h3 className="text-lg font-medium mb-2">Participants List</h3>
@@ -498,6 +604,7 @@ const OwnershipDetails = ({ userId, onClose, onSubmit }) => {
                       <th className="border border-gray-300 px-4 py-2">Economic Interest (%)</th>
                       <th className="border border-gray-300 px-4 py-2">Voting Rights (%)</th>
                       <th className="border border-gray-300 px-4 py-2">Outstanding Debt (R)</th>
+                      <th className="border border-gray-300 px-4 py-2">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -518,6 +625,22 @@ const OwnershipDetails = ({ userId, onClose, onSubmit }) => {
                         <td className="border border-gray-300 px-4 py-2">{participant.economicInterest}</td>
                         <td className="border border-gray-300 px-4 py-2">{participant.votingRights}</td>
                         <td className="border border-gray-300 px-4 py-2">{participant.outstandingDebt}</td>
+                        <td className="border border-gray-300 px-4 py-2">
+                          <button
+                            type="button"
+                            onClick={() => editParticipant(index)}
+                            className="bg-yellow-500 text-white px-2 py-1 rounded mr-2 hover:bg-yellow-600"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteParticipant(index)}
+                            className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
+                          >
+                            Delete
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -526,7 +649,7 @@ const OwnershipDetails = ({ userId, onClose, onSubmit }) => {
             </div>
           )}
 
-          {/* Entity Input Form (Second Table) */}
+          {/* Entity Input Form */}
           <div className="mb-6">
             <h3 className="text-lg font-medium mb-2">Add Entity</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -742,14 +865,14 @@ const OwnershipDetails = ({ userId, onClose, onSubmit }) => {
             </div>
             <button
               type="button"
-              onClick={addEntity}
+              onClick={editingEntityIndex !== null ? saveEditedEntity : addEntity}
               className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
             >
-              Add Entity
+              {editingEntityIndex !== null ? "Save Edited Entity" : "Add Entity"}
             </button>
           </div>
 
-          {/* Entities Table (Second Table) */}
+          {/* Entities Table */}
           {entities.length > 0 && (
             <div className="mb-6">
               <h3 className="text-lg font-medium mb-2">Entities List</h3>
@@ -775,6 +898,7 @@ const OwnershipDetails = ({ userId, onClose, onSubmit }) => {
                       <th className="border border-gray-300 px-4 py-2">ESOP/BBOS (%)</th>
                       <th className="border border-gray-300 px-4 py-2">Co-ops (%)</th>
                       <th className="border border-gray-300 px-4 py-2">Outstanding Debt by Black Participants (R)</th>
+                      <th className="border border-gray-300 px-4 py-2">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -798,6 +922,22 @@ const OwnershipDetails = ({ userId, onClose, onSubmit }) => {
                         <td className="border border-gray-300 px-4 py-2">{entity.esopBbos}</td>
                         <td className="border border-gray-300 px-4 py-2">{entity.coOps}</td>
                         <td className="border border-gray-300 px-4 py-2">{entity.outstandingDebtByBlackParticipants}</td>
+                        <td className="border border-gray-300 px-4 py-2">
+                          <button
+                            type="button"
+                            onClick={() => editEntity(index)}
+                            className="bg-yellow-500 text-white px-2 py-1 rounded mr-2 hover:bg-yellow-600"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteEntity(index)}
+                            className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
+                          >
+                            Delete
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
