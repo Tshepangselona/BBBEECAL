@@ -15,6 +15,7 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
     isExecutiveDirector: false,
     isIndependentNonExecutive: false
   });
+  const [editingManagerIndex, setEditingManagerIndex] = useState(null); // New state for editing
 
   const [managementData, setManagementData] = useState({
     totalVotingRights: 0,
@@ -39,6 +40,37 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
 
     const updatedManagers = [...managers, newManager];
     setManagers(updatedManagers);
+    resetNewManager();
+    recalculateManagementData(updatedManagers);
+  };
+
+  const editManager = (index) => {
+    setEditingManagerIndex(index);
+    setNewManager(managers[index]);
+  };
+
+  const saveEditedManager = () => {
+    if (!newManager.name || !newManager.idNumber || !newManager.position) {
+      alert('Please fill in the Name, ID Number, and Position.');
+      return;
+    }
+
+    const updatedManagers = managers.map((manager, index) =>
+      index === editingManagerIndex ? newManager : manager
+    );
+    setManagers(updatedManagers);
+    resetNewManager();
+    setEditingManagerIndex(null);
+    recalculateManagementData(updatedManagers);
+  };
+
+  const deleteManager = (index) => {
+    const updatedManagers = managers.filter((_, i) => i !== index);
+    setManagers(updatedManagers);
+    recalculateManagementData(updatedManagers);
+  };
+
+  const resetNewManager = () => {
     setNewManager({
       name: '',
       siteLocation: '',
@@ -52,8 +84,6 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
       isExecutiveDirector: false,
       isIndependentNonExecutive: false
     });
-
-    recalculateManagementData(updatedManagers);
   };
 
   const recalculateManagementData = (updatedManagers) => {
@@ -114,11 +144,8 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
         }),
       });
 
-      console.log('Response status:', response.status);
-
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('Error response:', errorData);
         throw new Error(`Failed to save management control data: ${errorData.error || 'Unknown error'}`);
       }
 
@@ -267,10 +294,10 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
             </div>
             <button
               type="button"
-              onClick={addManager}
+              onClick={editingManagerIndex !== null ? saveEditedManager : addManager}
               className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
             >
-              Add Manager
+              {editingManagerIndex !== null ? 'Save Edited Manager' : 'Add Manager'}
             </button>
           </div>
 
@@ -293,6 +320,7 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
                       <th className="border border-gray-300 px-4 py-2">Voting Rights (%)</th>
                       <th className="border border-gray-300 px-4 py-2">Executive Director</th>
                       <th className="border border-gray-300 px-4 py-2">Independent Non-Executive</th>
+                      <th className="border border-gray-300 px-4 py-2">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -309,6 +337,22 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
                         <td className="border border-gray-300 px-4 py-2">{manager.votingRights}</td>
                         <td className="border border-gray-300 px-4 py-2">{manager.isExecutiveDirector ? 'Yes' : 'No'}</td>
                         <td className="border border-gray-300 px-4 py-2">{manager.isIndependentNonExecutive ? 'Yes' : 'No'}</td>
+                        <td className="border border-gray-300 px-4 py-2">
+                          <button
+                            type="button"
+                            onClick={() => editManager(index)}
+                            className="bg-yellow-500 text-white px-2 py-1 rounded mr-2 hover:bg-yellow-600"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteManager(index)}
+                            className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
+                          >
+                            Delete
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -388,7 +432,7 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
               type="submit"
               className="bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-blue-700 w-full sm:w-auto transition-all duration-200"
             >
-              Save management Details
+              Save Management Details
             </button>
           </div>
         </form>
