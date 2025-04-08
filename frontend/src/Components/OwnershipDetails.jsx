@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios"; // Ensure axios is installed: `npm install axios`
+import axios from "axios";
 
 const OwnershipDetails = ({ userId, onClose, onSubmit }) => {
   const [participants, setParticipants] = useState([]);
@@ -61,6 +61,7 @@ const OwnershipDetails = ({ userId, onClose, onSubmit }) => {
 
   const [editingParticipantIndex, setEditingParticipantIndex] = useState(null);
   const [editingEntityIndex, setEditingEntityIndex] = useState(null);
+  const [documentId, setDocumentId] = useState(null);
 
   useEffect(() => {
     const fetchOwnershipData = async () => {
@@ -71,6 +72,7 @@ const OwnershipDetails = ({ userId, onClose, onSubmit }) => {
           setParticipants(records[0].participants);
           setEntities(records[0].entities);
           setOwnershipData(records[0].ownershipData);
+          setDocumentId(records[0].id); // Store the document ID
         }
       } catch (error) {
         console.error("Error fetching ownership details:", error);
@@ -384,10 +386,30 @@ const OwnershipDetails = ({ userId, onClose, onSubmit }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log("Submit clicked!");
     try {
       const payload = { userId, participants, entities, ownershipData };
-      const response = await axios.post("http://localhost:5000/ownership-details", payload);
-      console.log("Ownership details data saved:", response.data);
+      console.log("Payload being sent:", JSON.stringify(payload, null, 2)); // Detailed log
+      let response;
+      if (documentId) {
+        response = await axios.put(`http://localhost:5000/ownership-details/${documentId}`, payload);
+        console.log("Ownership details updated:", response.data);
+      } else {
+        try {
+          response = await axios.post("http://localhost:5000/ownership-details", payload);
+          console.log("Ownership details created:", response.data);
+          setDocumentId(response.data.id);
+        } catch (postError) {
+          if (postError.response?.status === 409) {
+            const existingId = postError.response.data.existingId;
+            response = await axios.put(`http://localhost:5000/ownership-details/${existingId}`, payload);
+            console.log("Ownership details updated after 409:", response.data);
+            setDocumentId(existingId);
+          } else {
+            throw postError;
+          }
+        }
+      }
       onSubmit(payload);
       onClose();
     } catch (error) {
@@ -396,6 +418,7 @@ const OwnershipDetails = ({ userId, onClose, onSubmit }) => {
     }
   };
 
+  
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-md p-6 w-full max-w-4xl max-h-[80vh] overflow-y-auto">

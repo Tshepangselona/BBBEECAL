@@ -1,18 +1,32 @@
 require('dotenv').config();
 const express = require("express");
 const cors = require("cors");
-const { auth, db } = require("./firebase");
+const { auth, db } = require("./firebase"); // Client SDK for auth and other client-side operations
 const { createUserWithEmailAndPassword, signInWithEmailAndPassword } = require("firebase/auth");
 const { doc, setDoc, getDoc, collection, addDoc, query, where, getDocs } = require("firebase/firestore");
 const SibApiV3Sdk = require('sib-api-v3-sdk');
 const crypto = require("crypto");
 const admin = require("firebase-admin");
-const serviceAccount = require("./serviceAccountKey.json"); // Path to your saved key
+
+// Firebase Admin SDK configuration from .env
+const serviceAccount = {
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"), // Handle newline characters
+  clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+  clientId: process.env.FIREBASE_CLIENT_ID,
+  authUri: process.env.FIREBASE_AUTH_URI,
+  tokenUri: process.env.FIREBASE_TOKEN_URI,
+  authProviderX509CertUrl: process.env.FIREBASE_AUTH_PROVIDER_CERT_URL,
+  clientX509CertUrl: process.env.FIREBASE_CLIENT_CERT_URL,
+  universeDomain: process.env.FIREBASE_UNIVERSE_DOMAIN,
+};
 
 // Initialize Firebase Admin SDK
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
+
+const adminDb = admin.firestore(); // Admin SDK Firestore instance
 
 const app = express();
 app.use(cors());
@@ -54,6 +68,7 @@ const validateDateFormat = (dateStr) => {
   return true;
 };
 
+// Signup route (unchanged)
 app.post("/signup", async (req, res) => {
   const { businessEmail, businessName, financialYearEnd, address, contactNumber } = req.body;
 
@@ -75,7 +90,6 @@ app.post("/signup", async (req, res) => {
       return res.status(400).json({ error: "Invalid date value for Financial Year End" });
     }
 
-    // Generate a random password
     const password = generatePassword();
     console.log("Generated password:", password);
     console.log("Type of password:", typeof password);
@@ -100,7 +114,6 @@ app.post("/signup", async (req, res) => {
       createdAt: new Date().toISOString(),
     });
 
-    // Generate password reset link
     const resetLink = await admin.auth().generatePasswordResetLink(businessEmail);
     console.log("Password reset link generated:", resetLink);
 
@@ -123,9 +136,9 @@ app.post("/signup", async (req, res) => {
                 <p style="font-size: 16px; line-height: 1.5;">Your account has been created successfully!</p>
                 <p style="font-size: 16px; line-height: 1.5;">Email: ${businessEmail}</p>
                 <p style="font-size: 16px; line-height: 1.5;">We’re excited to welcome you to Forge! You’ve just taken a key step toward simplifying your BBBEE compliance. Our calculator is designed to help you assess, plan, and achieve your empowerment goals with ease and accuracy. </p>
-                <pstyle="font-size: 16px; line-height: 1.5;">We’re currently reviewing your account creation and payment details. Once everything is confirmed, we’ll get back to you with full access details and next steps to start using the calculator. This won’t take long, and we’ll be in touch soon!</p>
-                <pstyle="font-size: 16px; line-height: 1.5;">In the meantime, if you have any questions, feel free to reach out to us at tebatsomoyaba@gmail.com. We’re here to assist you every step of the way.</p>
-                <pstyle="font-size: 16px; line-height: 1.5;">Looking forward to supporting your BBBEE success!</p>
+                <p style="font-size: 16px; line-height: 1.5;">We’re currently reviewing your account creation and payment details. Once everything is confirmed, we’ll get back to you with full access details and next steps to start using the calculator. This won’t take long, and we’ll be in touch soon!</p>
+                <p style="font-size: 16px; line-height: 1.5;">In the meantime, if you have any questions, feel free to reach out to us at tebatsomoyaba@gmail.com. We’re here to assist you every step of the way.</p>
+                <p style="font-size: 16px; line-height: 1.5;">Looking forward to supporting your BBBEE success!</p>
                 <p><a href="${resetLink}" style="color: #4a90e2; text-decoration: underline;">Set Your Password</a></p>
                 <p style="font-size: 14px; color: #777777; margin-top: 20px;">Best regards,<br><span style="color: #4a90e2; font-weight: bold;">Forge Academy</span></p>
               </td>
@@ -194,8 +207,7 @@ app.post("/signup", async (req, res) => {
   }
 });
 
-
-// New /update-profile endpoint
+// Update-profile endpoint (unchanged)
 app.patch("/update-profile", async (req, res) => {
   const { uid, businessName, sector } = req.body;
   console.log("Update profile request:", { uid, businessName, sector });
@@ -216,10 +228,10 @@ app.patch("/update-profile", async (req, res) => {
   }
 });
 
-// Login route
+// Login route (unchanged)
 app.post("/login", async (req, res) => {
   const { businessEmail, password } = req.body;
-  console.log("Login request received:", { businessEmail, password: "****" }); // Hide password
+  console.log("Login request received:", { businessEmail, password: "****" });
 
   try {
     console.log("Attempting Firebase login...");
@@ -253,12 +265,12 @@ app.post("/login", async (req, res) => {
   }
 });
 
-// Test route to confirm server is working
+// Test route (unchanged)
 app.get('/test', (req, res) => {
   res.status(200).json({ message: 'Test route working' });
 });
 
-// Management Control Table - Create
+// Management Control Table - Create (unchanged)
 app.post("/management-control", async (req, res) => {
   console.log("Management control POST hit with body:", req.body);
   const { userId, managers, managementData } = req.body;
@@ -317,7 +329,7 @@ app.post("/management-control", async (req, res) => {
   }
 });
 
-// Management Control - Retrieve
+// Management Control - Retrieve (unchanged)
 app.get("/management-control/:userId", async (req, res) => {  
   const { userId } = req.params;
 
@@ -348,7 +360,7 @@ app.get("/management-control/:userId", async (req, res) => {
   }
 });
 
-// Employment Equity - Create
+// Employment Equity - Create (unchanged)
 app.post("/employment-equity", async (req, res) => {
   console.log("Employment equity POST hit with body:", req.body);
   const { userId, employees, employmentData } = req.body;
@@ -413,7 +425,7 @@ app.post("/employment-equity", async (req, res) => {
   }
 });
 
-// Employment Equity - Retrieve
+// Employment Equity - Retrieve (unchanged)
 app.get("/employment-equity/:userId", async (req, res) => {
   const { userId } = req.params;
 
@@ -444,7 +456,7 @@ app.get("/employment-equity/:userId", async (req, res) => {
   }
 });
 
-// Yes 4 Youth Initiative - Create
+// Yes 4 Youth Initiative - Create (unchanged)
 app.post("/yes4youth-initiative", async (req, res) => {
   console.log("Yes 4 Youth Initiative POST hit with body:", req.body);
   const { userId, participants, yesData } = req.body;
@@ -509,7 +521,8 @@ app.post("/yes4youth-initiative", async (req, res) => {
     res.status(400).json({ error: error.message, code: error.code });
   }
 });
-// Yes 4 Youth Initiative - Retrieve
+
+// Yes 4 Youth Initiative - Retrieve (unchanged)
 app.get("/yes4youth-initiative/:userId", async (req, res) => {
   const { userId } = req.params;
 
@@ -540,7 +553,7 @@ app.get("/yes4youth-initiative/:userId", async (req, res) => {
   }
 });
 
-// Skills Development - Create
+// Skills Development - Create (unchanged)
 app.post("/skills-development", async (req, res) => {
   console.log("Skills Development POST hit with body:", req.body);
   const { userId, trainings, summary } = req.body;
@@ -615,7 +628,7 @@ app.post("/skills-development", async (req, res) => {
   }
 });
 
-// Skills Development - Retrieve
+// Skills Development - Retrieve (unchanged)
 app.get("/skills-development/:userId", async (req, res) => {
   const { userId } = req.params;
 
@@ -646,7 +659,7 @@ app.get("/skills-development/:userId", async (req, res) => {
   }
 });
 
-// Ownership Details - Create
+// Ownership Details - Create (Updated to Admin SDK)
 app.post("/ownership-details", async (req, res) => {
   console.log("Ownership Details POST hit with body:", req.body);
   const { userId, participants, entities, ownershipData } = req.body;
@@ -669,10 +682,20 @@ app.post("/ownership-details", async (req, res) => {
       return res.status(400).json({ error: "Ownership data must be an object" });
     }
 
-    const userDoc = await getDoc(doc(db, "users", userId));
-    if (!userDoc.exists()) {
+    const userDoc = await adminDb.collection("users").doc(userId).get();
+    if (!userDoc.exists) {
       console.log("User not found for userId:", userId);
       return res.status(404).json({ error: "User not found" });
+    }
+
+    const ownershipRef = adminDb.collection("ownershipDetails");
+    const q = await ownershipRef.where("userId", "==", userId).get();
+    if (!q.empty) {
+      console.log("Ownership details already exist for userId:", userId);
+      return res.status(409).json({
+        error: "Ownership details already exist for this user. Use PUT to update.",
+        existingId: q.docs[0].id,
+      });
     }
 
     const ownershipDetailsData = {
@@ -733,51 +756,170 @@ app.post("/ownership-details", async (req, res) => {
       updatedAt: new Date().toISOString(),
     };
 
-    const docRef = await addDoc(collection(db, "ownershipDetails"), ownershipDetailsData);
+    const docRef = await adminDb.collection("ownershipDetails").add(ownershipDetailsData);
 
+    console.log("Ownership details created with ID:", docRef.id);
     res.status(201).json({
       message: "Ownership details data saved successfully",
       id: docRef.id,
       ...ownershipDetailsData,
     });
   } catch (error) {
-    console.error("Detailed error:", error);
+    console.error("Detailed error in POST /ownership-details:", error.message, error.stack);
     res.status(400).json({ error: error.message, code: error.code });
   }
 });
 
-// Ownership Details - Retrieve
+// Ownership Details - Retrieve (Updated to Admin SDK)
 app.get("/ownership-details/:userId", async (req, res) => {
+  console.log("Ownership Details GET hit with userId:", req.params.userId);
   const { userId } = req.params;
 
   try {
-    const ownershipRef = collection(db, "ownershipDetails");
-    const q = query(ownershipRef, where("userId", "==", userId));
-    const querySnapshot = await getDocs(q);
+    if (!userId) {
+      console.log("Missing userId in GET request");
+      return res.status(400).json({ error: "User ID is required" });
+    }
 
-    const ownershipRecords = [];
-    querySnapshot.forEach((doc) => {
-      ownershipRecords.push({
-        id: doc.id,
-        ...doc.data(),
-      });
-    });
+    const querySnapshot = await adminDb.collection("ownershipDetails").where("userId", "==", userId).get();
+    const ownershipRecords = querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
 
     if (ownershipRecords.length === 0) {
+      console.log("No ownership details found for userId:", userId);
       return res.status(404).json({ message: "No ownership details data found for this user" });
     }
 
+    console.log("Ownership details retrieved for userId:", userId);
     res.status(200).json({
       message: "Ownership details data retrieved successfully",
       data: ownershipRecords,
     });
   } catch (error) {
-    console.error("Ownership details retrieval error:", error.code, error.message);
-    res.status(500).json({ error: error.message, code: error.code });
+    console.error("Ownership details retrieval error:", error.message, error.stack);
+    res.status(500).json({ error: "Failed to retrieve ownership details", code: error.code });
   }
 });
 
-// Enterprise Development - Create
+// Ownership Details - Update (Updated to Admin SDK)
+app.put("/ownership-details/:id", async (req, res) => {
+  console.log("Ownership Details PUT hit with body:", req.body);
+  const { id } = req.params;
+  const { userId, participants, entities, ownershipData } = req.body;
+
+  try {
+    if (!userId) {
+      console.log("Validation failed: Missing userId");
+      return res.status(400).json({ error: "User ID is required" });
+    }
+    if (!participants || !Array.isArray(participants)) {
+      console.log("Validation failed: Participants is not an array or missing", { participants });
+      return res.status(400).json({ error: "Participants must be an array" });
+    }
+    if (!entities || !Array.isArray(entities)) {
+      console.log("Validation failed: Entities is not an array or missing", { entities });
+      return res.status(400).json({ error: "Entities must be an array" });
+    }
+    if (!ownershipData || typeof ownershipData !== "object") {
+      console.log("Validation failed: OwnershipData is not an object or missing", { ownershipData });
+      return res.status(400).json({ error: "Ownership data must be an object" });
+    }
+
+    const userDoc = await adminDb.collection("users").doc(userId).get();
+    if (!userDoc.exists) {
+      console.log("User not found for userId:", userId);
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const docRef = adminDb.collection("ownershipDetails").doc(id);
+    const existingDoc = await docRef.get();
+    if (!existingDoc.exists) {
+      console.log("Ownership details not found for id:", id);
+      return res.status(404).json({ error: "Ownership details not found" });
+    }
+
+    const ownershipDetailsData = {
+      userId,
+      participants: participants.map((participant) => ({
+        name: participant.name || "",
+        idNumber: participant.idNumber || "",
+        race: participant.race || "",
+        gender: participant.gender || "",
+        isForeign: Boolean(participant.isForeign),
+        isNewEntrant: Boolean(participant.isNewEntrant),
+        designatedGroups: Boolean(participant.designatedGroups),
+        isYouth: Boolean(participant.isYouth),
+        isDisabled: Boolean(participant.isDisabled),
+        isUnemployed: Boolean(participant.isUnemployed),
+        isLivingInRuralAreas: Boolean(participant.isLivingInRuralAreas),
+        isMilitaryVeteran: Boolean(participant.isMilitaryVeteran),
+        economicInterest: Number(participant.economicInterest) || 0,
+        votingRights: Number(participant.votingRights) || 0,
+        outstandingDebt: Number(participant.outstandingDebt) || 0,
+      })),
+      entities: entities.map((entity) => ({
+        tier: entity.tier || "",
+        entityName: entity.entityName || "",
+        ownershipInNextTier: Number(entity.ownershipInNextTier) || 0,
+        modifiedFlowThroughApplied: Boolean(entity.modifiedFlowThroughApplied),
+        totalBlackVotingRights: Number(entity.totalBlackVotingRights) || 0,
+        blackWomenVotingRights: Number(entity.blackWomenVotingRights) || 0,
+        totalBlackEconomicInterest: Number(entity.totalBlackEconomicInterest) || 0,
+        blackWomenEconomicInterest: Number(entity.blackWomenEconomicInterest) || 0,
+        newEntrants: Number(entity.newEntrants) || 0,
+        designatedGroups: Number(entity.designatedGroups) || 0,
+        youth: Number(entity.youth) || 0,
+        disabled: Number(entity.disabled) || 0,
+        unemployed: Number(entity.unemployed) || 0,
+        livingInRuralAreas: Number(entity.livingInRuralAreas) || 0,
+        militaryVeteran: Number(entity.militaryVeteran) || 0,
+        esopBbos: Number(entity.esopBbos) || 0,
+        coOps: Number(entity.coOps) || 0,
+        outstandingDebtByBlackParticipants: Number(entity.outstandingDebtByBlackParticipants) || 0,
+      })),
+      ownershipData: {
+        blackOwnershipPercentage: Number(ownershipData.blackOwnershipPercentage) || 0,
+        blackFemaleOwnershipPercentage: Number(ownershipData.blackFemaleOwnershipPercentage) || 0,
+        blackYouthOwnershipPercentage: Number(ownershipData.blackYouthOwnershipPercentage) || 0,
+        blackDisabledOwnershipPercentage: Number(ownershipData.blackDisabledOwnershipPercentage) || 0,
+        blackUnemployedOwnershipPercentage: Number(ownershipData.blackUnemployedOwnershipPercentage) || 0,
+        blackRuralOwnershipPercentage: Number(ownershipData.blackRuralOwnershipPercentage) || 0,
+        blackMilitaryVeteranOwnershipPercentage: Number(ownershipData.blackMilitaryVeteranOwnershipPercentage) || 0,
+        votingRightsBlack: Number(ownershipData.votingRightsBlack) || 0,
+        votingRightsBlackFemale: Number(ownershipData.votingRightsBlackFemale) || 0,
+        economicInterestBlack: Number(ownershipData.economicInterestBlack) || 0,
+        economicInterestBlackFemale: Number(ownershipData.economicInterestBlackFemale) || 0,
+        ownershipFulfillment: Boolean(ownershipData.ownershipFulfillment),
+        netValue: Number(ownershipData.netValue) || 0,
+      },
+      updatedAt: new Date().toISOString(),
+    };
+
+    await docRef.update({
+      ...ownershipDetailsData,
+      createdAt: existingDoc.data().createdAt, // Preserve original createdAt
+    });
+
+    console.log("Ownership details updated with ID:", id);
+    res.status(200).json({
+      message: "Ownership details updated successfully",
+      id,
+      ...ownershipDetailsData,
+    });
+  } catch (error) {
+    console.error("Detailed error in PUT /ownership-details:", {
+      message: error.message,
+      code: error.code,
+      stack: error.stack,
+      requestBody: req.body,
+    });
+    res.status(400).json({ error: error.message, code: error.code });
+  }
+});
+
+// Enterprise Development - Create (unchanged)
 app.post("/enterprise-development", async (req, res) => {
   console.log("Enterprise Development POST hit with body:", req.body);
   const { userId, beneficiaries, summary } = req.body;
@@ -841,7 +983,7 @@ app.post("/enterprise-development", async (req, res) => {
   }
 });
 
-// Enterprise Development - Retrieve
+// Enterprise Development - Retrieve (unchanged)
 app.get("/enterprise-development/:userId", async (req, res) => {
   const { userId } = req.params;
 
@@ -872,7 +1014,7 @@ app.get("/enterprise-development/:userId", async (req, res) => {
   }
 });
 
-// Socio-Economic Development - Create
+// Socio-Economic Development - Create (unchanged)
 app.post("/socio-economic-development", async (req, res) => {
   console.log("Socio-Economic Development POST hit with body:", req.body);
   const { userId, beneficiaries, summary } = req.body;
@@ -930,7 +1072,7 @@ app.post("/socio-economic-development", async (req, res) => {
   }
 });
 
-// Socio-Economic Development - Retrieve
+// Socio-Economic Development - Retrieve (unchanged)
 app.get("/socio-economic-development/:userId", async (req, res) => {
   const { userId } = req.params;
 
@@ -961,7 +1103,7 @@ app.get("/socio-economic-development/:userId", async (req, res) => {
   }
 });
 
-// New /get-profile endpoint
+// Get-profile endpoint (unchanged)
 app.get("/get-profile", async (req, res) => {
   const { uid } = req.query;
   console.log("Get profile request for UID:", uid);
