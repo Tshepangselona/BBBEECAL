@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const EmploymentEquity = ({ userId, onClose, onSubmit }) => { // Added userId prop
+const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
   const occupationalLevels = [
     'Executive Management',
     'Other Executive Management',
@@ -24,6 +24,7 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => { // Added userId pr
     occupationalLevel: '',
     grossMonthlySalary: 0
   });
+  const [editingEmployeeIndex, setEditingEmployeeIndex] = useState(null); // New state for editing
 
   const [employmentData, setEmploymentData] = useState({
     totalEmployees: 0,
@@ -56,7 +57,39 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => { // Added userId pr
       return;
     }
 
-    setEmployees([...employees, newEmployee]);
+    const updatedEmployees = [...employees, newEmployee];
+    setEmployees(updatedEmployees);
+    resetNewEmployee();
+    recalculateEmploymentData(updatedEmployees);
+  };
+
+  const editEmployee = (index) => {
+    setEditingEmployeeIndex(index);
+    setNewEmployee(employees[index]);
+  };
+
+  const saveEditedEmployee = () => {
+    if (!newEmployee.name || !newEmployee.idNumber || !newEmployee.jobTitle || !newEmployee.occupationalLevel) {
+      alert('Please fill in the Name, ID Number, Job Title, and Occupational Level.');
+      return;
+    }
+
+    const updatedEmployees = employees.map((employee, index) =>
+      index === editingEmployeeIndex ? newEmployee : employee
+    );
+    setEmployees(updatedEmployees);
+    resetNewEmployee();
+    setEditingEmployeeIndex(null);
+    recalculateEmploymentData(updatedEmployees);
+  };
+
+  const deleteEmployee = (index) => {
+    const updatedEmployees = employees.filter((_, i) => i !== index);
+    setEmployees(updatedEmployees);
+    recalculateEmploymentData(updatedEmployees);
+  };
+
+  const resetNewEmployee = () => {
     setNewEmployee({
       name: '',
       siteLocation: '',
@@ -70,8 +103,6 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => { // Added userId pr
       occupationalLevel: '',
       grossMonthlySalary: 0
     });
-
-    recalculateEmploymentData([...employees, newEmployee]);
   };
 
   const recalculateEmploymentData = (updatedEmployees) => {
@@ -141,17 +172,14 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => { // Added userId pr
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          userId, // Include userId here
+          userId,
           employees,
           employmentData,
         }),
       });
 
-      console.log('Response status:', response.status);
-
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('Error response:', errorData);
         throw new Error(errorData.error || 'Failed to save employment equity data');
       }
 
@@ -312,10 +340,10 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => { // Added userId pr
             </div>
             <button
               type="button"
-              onClick={addEmployee}
+              onClick={editingEmployeeIndex !== null ? saveEditedEmployee : addEmployee}
               className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
             >
-              Add Employee
+              {editingEmployeeIndex !== null ? 'Save Edited Employee' : 'Add Employee'}
             </button>
           </div>
 
@@ -338,6 +366,7 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => { // Added userId pr
                       <th className="border border-gray-300 px-4 py-2">Foreign</th>
                       <th className="border border-gray-300 px-4 py-2">Occupational Level</th>
                       <th className="border border-gray-300 px-4 py-2">Gross Monthly Salary (R)</th>
+                      <th className="border border-gray-300 px-4 py-2">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -354,6 +383,22 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => { // Added userId pr
                         <td className="border border-gray-300 px-4 py-2">{employee.isForeign ? 'Yes' : 'No'}</td>
                         <td className="border border-gray-300 px-4 py-2">{employee.occupationalLevel}</td>
                         <td className="border border-gray-300 px-4 py-2">{employee.grossMonthlySalary}</td>
+                        <td className="border border-gray-300 px-4 py-2">
+                          <button
+                            type="button"
+                            onClick={() => editEmployee(index)}
+                            className="bg-yellow-500 text-white px-2 py-1 rounded mr-2 hover:bg-yellow-600"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteEmployee(index)}
+                            className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
+                          >
+                            Delete
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -453,7 +498,7 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => { // Added userId pr
               type="submit"
               className="bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-blue-700 w-full sm:w-auto transition-all duration-200"
             >
-              Save Employment Equity Details 
+              Save Employment Equity Details
             </button>
           </div>
         </form>
