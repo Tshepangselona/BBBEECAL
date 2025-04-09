@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => { // Added userId prop
+const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
   const occupationalLevels = [
     'Executive Management',
     'Other Executive Management',
@@ -26,6 +26,7 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => { // Added userId
     isCurrentYesEmployee: false,
     isCompletedYesAbsorbed: false
   });
+  const [editingParticipantIndex, setEditingParticipantIndex] = useState(null); // New state for editing
 
   const [yesData, setYesData] = useState({
     totalParticipants: 0,
@@ -49,7 +50,39 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => { // Added userId
       return;
     }
 
-    setParticipants([...participants, newParticipant]);
+    const updatedParticipants = [...participants, newParticipant];
+    setParticipants(updatedParticipants);
+    resetNewParticipant();
+    recalculateYesData(updatedParticipants);
+  };
+
+  const editParticipant = (index) => {
+    setEditingParticipantIndex(index);
+    setNewParticipant(participants[index]);
+  };
+
+  const saveEditedParticipant = () => {
+    if (!newParticipant.name || !newParticipant.idNumber || !newParticipant.jobTitle || !newParticipant.startDate) {
+      alert('Please fill in the Name, ID Number, Job Title, and Start Date.');
+      return;
+    }
+
+    const updatedParticipants = participants.map((participant, index) =>
+      index === editingParticipantIndex ? newParticipant : participant
+    );
+    setParticipants(updatedParticipants);
+    resetNewParticipant();
+    setEditingParticipantIndex(null);
+    recalculateYesData(updatedParticipants);
+  };
+
+  const deleteParticipant = (index) => {
+    const updatedParticipants = participants.filter((_, i) => i !== index);
+    setParticipants(updatedParticipants);
+    recalculateYesData(updatedParticipants);
+  };
+
+  const resetNewParticipant = () => {
     setNewParticipant({
       name: '',
       siteLocation: '',
@@ -65,8 +98,6 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => { // Added userId
       isCurrentYesEmployee: false,
       isCompletedYesAbsorbed: false
     });
-
-    recalculateYesData([...participants, newParticipant]);
   };
 
   const recalculateYesData = (updatedParticipants) => {
@@ -121,11 +152,8 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => { // Added userId
         }),
       });
 
-      console.log('Response status:', response.status);
-
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('Error response:', errorData);
         throw new Error(errorData.error || 'Failed to save YES initiative data');
       }
 
@@ -305,10 +333,10 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => { // Added userId
             </div>
             <button
               type="button"
-              onClick={addParticipant}
+              onClick={editingParticipantIndex !== null ? saveEditedParticipant : addParticipant}
               className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
             >
-              Add Participant
+              {editingParticipantIndex !== null ? 'Save Edited Participant' : 'Add Participant'}
             </button>
           </div>
 
@@ -333,6 +361,7 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => { // Added userId
                       <th className="border border-gray-300 px-4 py-2">End Date</th>
                       <th className="border border-gray-300 px-4 py-2">Current YES Employee</th>
                       <th className="border border-gray-300 px-4 py-2">Completed YES Absorbed</th>
+                      <th className="border border-gray-300 px-4 py-2">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -351,6 +380,22 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => { // Added userId
                         <td className="border border-gray-300 px-4 py-2">{participant.endDate || 'N/A'}</td>
                         <td className="border border-gray-300 px-4 py-2">{participant.isCurrentYesEmployee ? 'Yes' : 'No'}</td>
                         <td className="border border-gray-300 px-4 py-2">{participant.isCompletedYesAbsorbed ? 'Yes' : 'No'}</td>
+                        <td className="border border-gray-300 px-4 py-2">
+                          <button
+                            type="button"
+                            onClick={() => editParticipant(index)}
+                            className="bg-yellow-500 text-white px-2 py-1 rounded mr-2 hover:bg-yellow-600"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteParticipant(index)}
+                            className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
+                          >
+                            Delete
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
