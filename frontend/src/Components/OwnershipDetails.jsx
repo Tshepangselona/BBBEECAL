@@ -116,12 +116,39 @@ const OwnershipDetails = ({ userId, onClose, onSubmit }) => {
     recalculateOwnershipData([...participants, newParticipant]);
   };
 
-  const deleteParticipant = (index) => {
-    const updatedParticipants = participants.filter((_, i) => i !== index);
+// Delete owner
+const deleteParticipant = async (userId) => {
+  try {
+    const response = await fetch(`http://localhost:5000/ownership-details/${userId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to delete ownership details');
+    }
+
+    const data = await response.json();
+    console.log(data.message);
+
+    // Update local state
+    const updatedParticipants = participants.filter(p => p.userId !== userId);
     setParticipants(updatedParticipants);
     recalculateOwnershipData(updatedParticipants);
-  };
 
+  } catch (error) {
+    console.error('Error deleting participant:', error);
+    // Optionally show error to user
+    alert(`Error: ${error.message}`);
+  }
+
+  setParticipants([]);
+};
+
+  
   const editParticipant = (index) => {
     setEditingParticipantIndex(index);
     setNewParticipant(participants[index]);
@@ -605,7 +632,8 @@ const OwnershipDetails = ({ userId, onClose, onSubmit }) => {
           </div>
 
           {/* Participants Table */}
-          {participants.length > 0 && (
+{/* Participants Table */}
+{participants.length > 0 && (
             <div className="mb-6">
               <h3 className="text-lg font-medium mb-2">Participants List</h3>
               <div className="overflow-x-auto">
@@ -658,7 +686,7 @@ const OwnershipDetails = ({ userId, onClose, onSubmit }) => {
                           </button>
                           <button
                             type="button"
-                            onClick={() => deleteParticipant(index)}
+                            onClick={() => deleteParticipant(userId)}
                             className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
                           >
                             Delete
@@ -671,7 +699,6 @@ const OwnershipDetails = ({ userId, onClose, onSubmit }) => {
               </div>
             </div>
           )}
-
           {/* Entity Input Form */}
           <div className="mb-6">
             <h3 className="text-lg font-medium mb-2">Add Entity</h3>

@@ -11,7 +11,7 @@ const admin = require("firebase-admin");
 // Firebase Admin SDK configuration from .env
 const serviceAccount = {
   projectId: process.env.FIREBASE_PROJECT_ID,
-  privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"), // Handle newline characters
+  privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"), 
   clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
   clientId: process.env.FIREBASE_CLIENT_ID,
   authUri: process.env.FIREBASE_AUTH_URI,
@@ -628,7 +628,7 @@ app.post("/skills-development", async (req, res) => {
   }
 });
 
-// Skills Development - Retrieve (unchanged)
+// Skills Development - Retrieve 
 app.get("/skills-development/:userId", async (req, res) => {
   const { userId } = req.params;
 
@@ -659,7 +659,7 @@ app.get("/skills-development/:userId", async (req, res) => {
   }
 });
 
-// Ownership Details - Create (Updated to Admin SDK)
+// Ownership Details - Create 
 app.post("/ownership-details", async (req, res) => {
   console.log("Ownership Details POST hit with body:", req.body);
   const { userId, participants, entities, ownershipData } = req.body;
@@ -916,6 +916,52 @@ app.put("/ownership-details/:id", async (req, res) => {
       requestBody: req.body,
     });
     res.status(400).json({ error: error.message, code: error.code });
+  }
+});
+
+// Delete Ownership Details
+app.delete("/ownership-details/:userId", async (req, res) => {
+  console.log("Ownership Details DELETE hit with userId:", req.params.userId);
+  const { userId } = req.params;
+
+  try {
+    if (!userId) {
+      console.log("Missing userId in params");
+      return res.status(400).json({ error: "User ID is required" });
+    }
+
+    // Check if user exists
+    const userDoc = await adminDb.collection("users").doc(userId).get();
+    if (!userDoc.exists) {
+      console.log("User not found for userId:", userId);
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Find ownership details document for this user
+    const ownershipRef = adminDb.collection("ownershipDetails");
+    const query = await ownershipRef.where("userId", "==", userId).get();
+
+    if (query.empty) {
+      console.log("No ownership details found for userId:", userId);
+      return res.status(404).json({ error: "Ownership details not found for this user" });
+    }
+
+    // Since userId should be unique, there should only be one document
+    const docToDelete = query.docs[0];
+    
+    // Delete the document
+    await adminDb.collection("ownershipDetails").doc(docToDelete.id).delete();
+
+    console.log("Ownership details deleted for userId:", userId);
+    res.status(200).json({
+      message: "Ownership details deleted successfully",
+      userId: userId,
+      deletedDocId: docToDelete.id
+    });
+
+  } catch (error) {
+    console.error("Detailed error in DELETE /ownership-details:", error.message, error.stack);
+    res.status(500).json({ error: "Failed to delete ownership details", details: error.message });
   }
 });
 
