@@ -15,6 +15,7 @@ const EnterpriseDevelopment = ({ userId, onClose, onSubmit }) => {
     paymentDate: "",
     contributionAmount: 0,
   });
+  const [editingBeneficiaryIndex, setEditingBeneficiaryIndex] = useState(null); // New state for editing
 
   const [summary, setSummary] = useState({
     totalBeneficiaries: 0,
@@ -69,6 +70,41 @@ const EnterpriseDevelopment = ({ userId, onClose, onSubmit }) => {
 
     const updatedBeneficiaries = [...beneficiaries, newBeneficiary];
     setBeneficiaries(updatedBeneficiaries);
+    resetNewBeneficiary();
+    recalculateSummary(updatedBeneficiaries);
+  };
+
+  const editBeneficiary = (index) => {
+    setEditingBeneficiaryIndex(index);
+    setNewBeneficiary(beneficiaries[index]);
+  };
+
+  const saveEditedBeneficiary = () => {
+    if (
+      !newBeneficiary.beneficiaryName ||
+      !newBeneficiary.contributionAmount ||
+      !newBeneficiary.contributionType
+    ) {
+      alert("Please fill in the Beneficiary Name, Contribution Amount, and Contribution Type.");
+      return;
+    }
+
+    const updatedBeneficiaries = beneficiaries.map((beneficiary, index) =>
+      index === editingBeneficiaryIndex ? newBeneficiary : beneficiary
+    );
+    setBeneficiaries(updatedBeneficiaries);
+    resetNewBeneficiary();
+    setEditingBeneficiaryIndex(null);
+    recalculateSummary(updatedBeneficiaries);
+  };
+
+  const deleteBeneficiary = (index) => {
+    const updatedBeneficiaries = beneficiaries.filter((_, i) => i !== index);
+    setBeneficiaries(updatedBeneficiaries);
+    recalculateSummary(updatedBeneficiaries);
+  };
+
+  const resetNewBeneficiary = () => {
     setNewBeneficiary({
       beneficiaryName: "",
       siteLocation: "",
@@ -82,8 +118,6 @@ const EnterpriseDevelopment = ({ userId, onClose, onSubmit }) => {
       paymentDate: "",
       contributionAmount: 0,
     });
-
-    recalculateSummary(updatedBeneficiaries);
   };
 
   const recalculateSummary = (updatedBeneficiaries) => {
@@ -292,10 +326,10 @@ const EnterpriseDevelopment = ({ userId, onClose, onSubmit }) => {
             </div>
             <button
               type="button"
-              onClick={addBeneficiary}
+              onClick={editingBeneficiaryIndex !== null ? saveEditedBeneficiary : addBeneficiary}
               className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
             >
-              Add Beneficiary
+              {editingBeneficiaryIndex !== null ? "Save Edited Beneficiary" : "Add Beneficiary"}
             </button>
           </div>
 
@@ -318,6 +352,7 @@ const EnterpriseDevelopment = ({ userId, onClose, onSubmit }) => {
                       <th className="border border-gray-300 px-4 py-2">Date of Contribution</th>
                       <th className="border border-gray-300 px-4 py-2">Payment Date</th>
                       <th className="border border-gray-300 px-4 py-2">Amount of Contribution (R)</th>
+                      <th className="border border-gray-300 px-4 py-2">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -331,17 +366,33 @@ const EnterpriseDevelopment = ({ userId, onClose, onSubmit }) => {
                         <td className="border border-gray-300 px-4 py-2">
                           {beneficiary.blackOwnershipPercentage}%
                         </td>
-                        <td className="border border-gray-300 px-4 py-2">
+                        <td className="border border-gray- RGBA px-4 py-2">
                           {beneficiary.blackWomenOwnershipPercentage}%
                         </td>
-                        <td className="border border-gray-300 px-4 py-2">{beneficiary.beeStatusLevel}</td>
+                        <td className="border border-gray-300 px-4 py-2">{beneficiary.beeStatusLevel || "N/A"}</td>
                         <td className="border border-gray-300 px-4 py-2">{beneficiary.contributionType}</td>
                         <td className="border border-gray-300 px-4 py-2">
-                          {beneficiary.contributionDescription}
+                          {beneficiary.contributionDescription || "N/A"}
                         </td>
-                        <td className="border border-gray-300 px-4 py-2">{beneficiary.dateOfContribution}</td>
-                        <td className="border border-gray-300 px-4 py-2">{beneficiary.paymentDate}</td>
+                        <td className="border border-gray-300 px-4 py-2">{beneficiary.dateOfContribution || "N/A"}</td>
+                        <td className="border border-gray-300 px-4 py-2">{beneficiary.paymentDate || "N/A"}</td>
                         <td className="border border-gray-300 px-4 py-2">{beneficiary.contributionAmount}</td>
+                        <td className="border border-gray-300 px-4 py-2">
+                          <button
+                            type="button"
+                            onClick={() => editBeneficiary(index)}
+                            className="bg-yellow-500 text-white px-2 py-1 rounded mr-2 hover:bg-yellow-600"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteBeneficiary(index)}
+                            className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
+                          >
+                            Delete
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

@@ -16,8 +16,9 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
     blackOwnedPercentage: 0,
     blackWomanOwnedPercentage: 0,
     isESDRecipient: false,
-    beeCertificateExpiryDate: '', // Ensure this is an empty string initially
+    beeCertificateExpiryDate: '',
   });
+  const [editingSupplierIndex, setEditingSupplierIndex] = useState(null); // New state for editing local supplier
 
   const [localSummary, setLocalSummary] = useState({
     totalSuppliers: 0,
@@ -36,6 +37,7 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
     reasonForImport: '',
     esdPlan: '',
   });
+  const [editingImportIndex, setEditingImportIndex] = useState(null); // New state for editing import
 
   const [importSummary, setImportSummary] = useState({
     totalImports: 0,
@@ -62,6 +64,39 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
 
     const updatedSuppliers = [...localSuppliers, newLocalSupplier];
     setLocalSuppliers(updatedSuppliers);
+    resetNewLocalSupplier();
+    recalculateLocalSummary(updatedSuppliers);
+  };
+
+  const editLocalSupplier = (index) => {
+    setEditingSupplierIndex(index);
+    setNewLocalSupplier(localSuppliers[index]);
+  };
+
+  const saveEditedLocalSupplier = () => {
+    if (!newLocalSupplier.supplierName.trim() || 
+        newLocalSupplier.expenditure <= 0 || 
+        !newLocalSupplier.supplierClassification.trim()) {
+      alert('Please fill in the Supplier Name, Expenditure (greater than 0), and Supplier Classification.');
+      return;
+    }
+
+    const updatedSuppliers = localSuppliers.map((supplier, index) =>
+      index === editingSupplierIndex ? newLocalSupplier : supplier
+    );
+    setLocalSuppliers(updatedSuppliers);
+    resetNewLocalSupplier();
+    setEditingSupplierIndex(null);
+    recalculateLocalSummary(updatedSuppliers);
+  };
+
+  const deleteLocalSupplier = (index) => {
+    const updatedSuppliers = localSuppliers.filter((_, i) => i !== index);
+    setLocalSuppliers(updatedSuppliers);
+    recalculateLocalSummary(updatedSuppliers);
+  };
+
+  const resetNewLocalSupplier = () => {
     setNewLocalSupplier({
       supplierName: '',
       siteLocation: '',
@@ -78,8 +113,6 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
       isESDRecipient: false,
       beeCertificateExpiryDate: '',
     });
-
-    recalculateLocalSummary(updatedSuppliers);
   };
 
   const recalculateLocalSummary = (updatedSuppliers) => {
@@ -118,6 +151,39 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
 
     const updatedImports = [...imports, newImport];
     setImports(updatedImports);
+    resetNewImport();
+    recalculateImportSummary(updatedImports);
+  };
+
+  const editImport = (index) => {
+    setEditingImportIndex(index);
+    setNewImport(imports[index]);
+  };
+
+  const saveEditedImport = () => {
+    if (!newImport.foreignSupplierName.trim() || 
+        newImport.expenditure <= 0 || 
+        !newImport.goodsServices.trim()) {
+      alert('Please fill in the Foreign Supplier Name, Expenditure (greater than 0), and Goods/Services.');
+      return;
+    }
+
+    const updatedImports = imports.map((imp, index) =>
+      index === editingImportIndex ? newImport : imp
+    );
+    setImports(updatedImports);
+    resetNewImport();
+    setEditingImportIndex(null);
+    recalculateImportSummary(updatedImports);
+  };
+
+  const deleteImport = (index) => {
+    const updatedImports = imports.filter((_, i) => i !== index);
+    setImports(updatedImports);
+    recalculateImportSummary(updatedImports);
+  };
+
+  const resetNewImport = () => {
     setNewImport({
       foreignSupplierName: '',
       siteLocation: '',
@@ -126,8 +192,6 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
       reasonForImport: '',
       esdPlan: '',
     });
-
-    recalculateImportSummary(updatedImports);
   };
 
   const recalculateImportSummary = (updatedImports) => {
@@ -327,10 +391,10 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
             </div>
             <button
               type="button"
-              onClick={addLocalSupplier}
+              onClick={editingSupplierIndex !== null ? saveEditedLocalSupplier : addLocalSupplier}
               className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
             >
-              Add Local Supplier
+              {editingSupplierIndex !== null ? 'Save Edited Supplier' : 'Add Local Supplier'}
             </button>
           </div>
 
@@ -352,10 +416,11 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
                       <th className="border border-gray-300 px-4 py-2">30%+ Black Owned</th>
                       <th className="border border-gray-300 px-4 py-2">51%+ Black Owned</th>
                       <th className="border border-gray-300 px-4 py-2">30%+ Black Woman Owned</th>
-                      <th className="border border-gray-300 px-4 py-2">Black Owned (%)</th> {/* Fixed missing = */}
+                      <th className="border border-gray-300 px-4 py-2">Black Owned (%)</th>
                       <th className="border border-gray-300 px-4 py-2">Black Woman Owned (%)</th>
                       <th className="border border-gray-300 px-4 py-2">ESD Recipient</th>
                       <th className="border border-gray-300 px-4 py-2">BEE Certificate Expiry</th>
+                      <th className="border border-gray-300 px-4 py-2">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -374,7 +439,24 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
                         <td className="border border-gray-300 px-4 py-2">{supplier.blackOwnedPercentage}%</td>
                         <td className="border border-gray-300 px-4 py-2">{supplier.blackWomanOwnedPercentage}%</td>
                         <td className="border border-gray-300 px-4 py-2">{supplier.isESDRecipient ? 'Yes' : 'No'}</td>
-                        <td className="border border-gray-300 px-4 py-2">{supplier.beeCertificateExpiryDate || 'N/A'}</td>
+                        <td className="border border-gray-3
+00 px-4 py-2">{supplier.beeCertificateExpiryDate || 'N/A'}</td>
+                        <td className="border border-gray-300 px-4 py-2">
+                          <button
+                            type="button"
+                            onClick={() => editLocalSupplier(index)}
+                            className="bg-yellow-500 text-white px-2 py-1 rounded mr-2 hover:bg-yellow-600"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteLocalSupplier(index)}
+                            className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
+                          >
+                            Delete
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -512,10 +594,10 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
             </div>
             <button
               type="button"
-              onClick={addImport}
+              onClick={editingImportIndex !== null ? saveEditedImport : addImport}
               className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
             >
-              Add Import
+              {editingImportIndex !== null ? 'Save Edited Import' : 'Add Import'}
             </button>
           </div>
 
@@ -533,6 +615,7 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
                       <th className="border border-gray-300 px-4 py-2">Expenditure in ZAR</th>
                       <th className="border border-gray-300 px-4 py-2">Reason for Import</th>
                       <th className="border border-gray-300 px-4 py-2">ESD Plan</th>
+                      <th className="border border-gray-300 px-4 py-2">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -544,6 +627,22 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
                         <td className="border border-gray-300 px-4 py-2">{imp.expenditure}</td>
                         <td className="border border-gray-300 px-4 py-2">{imp.reasonForImport || 'N/A'}</td>
                         <td className="border border-gray-300 px-4 py-2">{imp.esdPlan || 'N/A'}</td>
+                        <td className="border border-gray-300 px-4 py-2">
+                          <button
+                            type="button"
+                            onClick={() => editImport(index)}
+                            className="bg-yellow-500 text-white px-2 py-1 rounded mr-2 hover:bg-yellow-600"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteImport(index)}
+                            className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
+                          >
+                            Delete
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
