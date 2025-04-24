@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios"; // You'll need to install axios: `npm install axios`
+import axios from "axios"; // Ensure axios is installed: `npm install axios`
 
 const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
   const categories = [
@@ -35,6 +35,7 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
     isUnemployedLearner: false,
     isAbsorbedInternalTrainer: false,
   });
+  const [editingTrainingIndex, setEditingTrainingIndex] = useState(null); // New state for editing
 
   const [summary, setSummary] = useState({
     totalTrainings: 0,
@@ -78,7 +79,39 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
       return;
     }
 
-    setTrainings([...trainings, newTraining]);
+    const updatedTrainings = [...trainings, newTraining];
+    setTrainings(updatedTrainings);
+    resetNewTraining();
+    recalculateSummary(updatedTrainings);
+  };
+
+  const editTraining = (index) => {
+    setEditingTrainingIndex(index);
+    setNewTraining(trainings[index]);
+  };
+
+  const saveEditedTraining = () => {
+    if (!newTraining.startDate || !newTraining.trainingCourse || !newTraining.learnerName || !newTraining.idNumber || !newTraining.category) {
+      alert("Please fill in the Start Date, Training Course, Learner Name, ID Number, and Category.");
+      return;
+    }
+
+    const updatedTrainings = trainings.map((training, index) =>
+      index === editingTrainingIndex ? newTraining : training
+    );
+    setTrainings(updatedTrainings);
+    resetNewTraining();
+    setEditingTrainingIndex(null);
+    recalculateSummary(updatedTrainings);
+  };
+
+  const deleteTraining = (index) => {
+    const updatedTrainings = trainings.filter((_, i) => i !== index);
+    setTrainings(updatedTrainings);
+    recalculateSummary(updatedTrainings);
+  };
+
+  const resetNewTraining = () => {
     setNewTraining({
       startDate: "",
       endDate: "",
@@ -100,8 +133,6 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
       isUnemployedLearner: false,
       isAbsorbedInternalTrainer: false,
     });
-
-    recalculateSummary([...trainings, newTraining]);
   };
 
   const recalculateSummary = (updatedTrainings) => {
@@ -149,7 +180,7 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
       alert("Failed to save skills development data. Please try again.");
     }
   };
-    
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-md p-6 w-full max-w-5xl max-h-[80vh] overflow-y-auto">
@@ -381,10 +412,10 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
             </div>
             <button
               type="button"
-              onClick={addTraining}
+              onClick={editingTrainingIndex !== null ? saveEditedTraining : addTraining}
               className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
             >
-              Add Training
+              {editingTrainingIndex !== null ? "Save Edited Training" : "Add Training"}
             </button>
           </div>
 
@@ -415,6 +446,7 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
                       <th className="border border-gray-300 px-4 py-2">Number of Participants</th>
                       <th className="border border-gray-300 px-4 py-2">Unemployed Learner</th>
                       <th className="border border-gray-300 px-4 py-2">Absorbed Internal Trainer</th>
+                      <th className="border border-gray-300 px-4 py-2">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -439,6 +471,22 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
                         <td className="border border-gray-300 px-4 py-2">{training.numberOfParticipants}</td>
                         <td className="border border-gray-300 px-4 py-2">{training.isUnemployedLearner ? 'Yes' : 'No'}</td>
                         <td className="border border-gray-300 px-4 py-2">{training.isAbsorbedInternalTrainer ? 'Yes' : 'No'}</td>
+                        <td className="border border-gray-300 px-4 py-2">
+                          <button
+                            type="button"
+                            onClick={() => editTraining(index)}
+                            className="bg-yellow-500 text-white px-2 py-1 rounded mr-2 hover:bg-yellow-600"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteTraining(index)}
+                            className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
+                          >
+                            Delete
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
