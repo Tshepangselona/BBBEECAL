@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const ManagementControl = ({ userId, onClose, onSubmit }) => {
   const [managers, setManagers] = useState([]);
@@ -13,22 +13,45 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
     isDisabled: false,
     votingRights: 0,
     isExecutiveDirector: false,
-    isIndependentNonExecutive: false
+    isIndependentNonExecutive: false,
   });
-  const [editingManagerIndex, setEditingManagerIndex] = useState(null); // New state for editing
-
+  const [editingManagerIndex, setEditingManagerIndex] = useState(null);
   const [managementData, setManagementData] = useState({
     totalVotingRights: 0,
     blackVotingRights: 0,
     blackFemaleVotingRights: 0,
-    disabledVotingRights: 0
+    disabledVotingRights: 0,
   });
+
+  // Fetch existing data on mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await fetch(`http://localhost:5000/management-control/${userId}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (response.ok) {
+          const { data } = await response.json();
+          if (data.length > 0) {
+            setManagers(data[0].managers);
+            setManagementData(data[0].managementData);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching management control data:', error);
+      }
+    };
+
+    if (userId) fetchData();
+  }, [userId]);
 
   const handleManagerChange = (e) => {
     const { name, value, type, checked } = e.target;
     setNewManager({
       ...newManager,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: type === 'checkbox' ? checked : value,
     });
   };
 
@@ -64,11 +87,6 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
     recalculateManagementData(updatedManagers);
   };
 
-  const deleteManager = (index) => {
-    const updatedManagers = managers.filter((_, i) => i !== index);
-    setManagers(updatedManagers);
-    recalculateManagementData(updatedManagers);
-  };
 
   const resetNewManager = () => {
     setNewManager({
@@ -82,7 +100,7 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
       isDisabled: false,
       votingRights: 0,
       isExecutiveDirector: false,
-      isIndependentNonExecutive: false
+      isIndependentNonExecutive: false,
     });
   };
 
@@ -110,7 +128,7 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
       totalVotingRights,
       blackVotingRights,
       blackFemaleVotingRights,
-      disabledVotingRights
+      disabledVotingRights,
     });
   };
 
@@ -118,7 +136,7 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
     const { name, value } = e.target;
     setManagementData({
       ...managementData,
-      [name]: Number(value)
+      [name]: Number(value),
     });
   };
 
@@ -132,16 +150,29 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
     }
 
     try {
-      const response = await fetch('http://localhost:5000/management-control', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId,
-          managers,
-          managementData
-        }),
+      // Check if data exists to determine POST or PUT
+      const checkResponse = await fetch(`http://localhost:5000/management-control/${userId}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      let method = 'POST';
+      let url = 'http://localhost:5000/management-control';
+      let existingId = null;
+
+      if (checkResponse.ok) {
+        const { data } = await checkResponse.json();
+        if (data.length > 0) {
+          method = 'PUT';
+          existingId = data[0].id;
+          url = `http://localhost:5000/management-control/${existingId}`;
+        }
+      }
+
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, managers, managementData }),
       });
 
       if (!response.ok) {
@@ -156,6 +187,32 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
     } catch (error) {
       console.error('Error saving management control data:', error);
       alert(`Failed to save management control data: ${error.message}`);
+    }
+  };
+
+  const deleteManagementControl = async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/management-control/${userId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Failed to delete management control data: ${errorData.error}`);
+      }
+
+      console.log('Management control data deleted');
+      setManagers([]);
+      setManagementData({
+        totalVotingRights: 0,
+        blackVotingRights: 0,
+        blackFemaleVotingRights: 0,
+        disabledVotingRights: 0,
+      });
+    } catch (error) {
+      console.error('Error deleting management control data:', error);
+      alert(`Failed to delete: ${error.message}`);
     }
   };
 
@@ -347,8 +404,8 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
                           </button>
                           <button
                             type="button"
-                            onClick={() => deleteManager(index)}
-                            className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
+                            onClick={deleteManagementControl}
+                            className="bg-red-500 text-white px-2 py-1 rounded mr-2 hover:bg-red-600"
                           >
                             Delete
                           </button>
@@ -428,6 +485,7 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
             >
               Cancel
             </button>
+           
             <button
               type="submit"
               className="bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-blue-700 w-full sm:w-auto transition-all duration-200"

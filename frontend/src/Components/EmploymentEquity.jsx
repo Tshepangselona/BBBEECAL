@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
   const occupationalLevels = [
@@ -7,7 +7,7 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
     'Senior Management',
     'Middle Management',
     'Junior Management',
-    'Other, Semi-Skilled & Unskilled'
+    'Other, Semi-Skilled & Unskilled',
   ];
 
   const [employees, setEmployees] = useState([]);
@@ -22,10 +22,9 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
     descriptionOfDisability: '',
     isForeign: false,
     occupationalLevel: '',
-    grossMonthlySalary: 0
+    grossMonthlySalary: 0,
   });
-  const [editingEmployeeIndex, setEditingEmployeeIndex] = useState(null); // New state for editing
-
+  const [editingEmployeeIndex, setEditingEmployeeIndex] = useState(null);
   const [employmentData, setEmploymentData] = useState({
     totalEmployees: 0,
     blackEmployees: 0,
@@ -37,17 +36,41 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
         total: 0,
         black: 0,
         blackFemale: 0,
-        disabled: 0
+        disabled: 0,
       };
       return acc;
-    }, {})
+    }, {}),
   });
+
+  // Fetch existing data on mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await fetch(`http://localhost:5000/employment-equity/${userId}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (response.ok) {
+          const { data } = await response.json();
+          if (data.length > 0) {
+            setEmployees(data[0].employees);
+            setEmploymentData(data[0].employmentData);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching employment equity data:', error);
+      }
+    };
+
+    if (userId) fetchData();
+  }, [userId]);
 
   const handleEmployeeChange = (e) => {
     const { name, value, type, checked } = e.target;
     setNewEmployee({
       ...newEmployee,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: type === 'checkbox' ? checked : value,
     });
   };
 
@@ -83,12 +106,6 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
     recalculateEmploymentData(updatedEmployees);
   };
 
-  const deleteEmployee = (index) => {
-    const updatedEmployees = employees.filter((_, i) => i !== index);
-    setEmployees(updatedEmployees);
-    recalculateEmploymentData(updatedEmployees);
-  };
-
   const resetNewEmployee = () => {
     setNewEmployee({
       name: '',
@@ -101,7 +118,7 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
       descriptionOfDisability: '',
       isForeign: false,
       occupationalLevel: '',
-      grossMonthlySalary: 0
+      grossMonthlySalary: 0,
     });
   };
 
@@ -117,7 +134,7 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
         total: 0,
         black: 0,
         blackFemale: 0,
-        disabled: 0
+        disabled: 0,
       };
       return acc;
     }, {});
@@ -151,7 +168,7 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
       blackFemaleEmployees,
       disabledEmployees,
       foreignEmployees,
-      byOccupationalLevel
+ byOccupationalLevel,
     });
   };
 
@@ -160,27 +177,39 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
     console.log('Submitting data:', { userId, employees, employmentData });
 
     if (!userId) {
-      console.log('User ID is missing!');
       alert('User ID is missing. Please ensure you are logged in.');
       return;
     }
 
     try {
-      const response = await fetch('http://localhost:5000/employment-equity', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId,
-          employees,
-          employmentData,
-        }),
+      // Check if data exists to determine POST or PUT
+      const checkResponse = await fetch(`http://localhost:5000/employment-equity/${userId}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      let method = 'POST';
+      let url = 'http://localhost:5000/employment-equity';
+      let existingId = null;
+
+      if (checkResponse.ok) {
+        const { data } = await checkResponse.json();
+        if (data.length > 0) {
+          method = 'PUT';
+          existingId = data[0].id;
+          url = `http://localhost:5000/employment-equity/${existingId}`;
+        }
+      }
+
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, employees, employmentData }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save employment equity data');
+        throw new Error(`Failed to save employment equity data: ${errorData.error || 'Unknown error'}`);
       }
 
       const result = await response.json();
@@ -188,8 +217,44 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
       onSubmit({ employees, employmentData });
       onClose();
     } catch (error) {
-      console.error('Error submitting employment equity:', error);
+      console.error('Error saving employment equity data:', error);
       alert(`Failed to save employment equity data: ${error.message}`);
+    }
+  };
+
+  const deleteEmploymentEquity = async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/employment-equity/${userId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Failed to delete employment equity data: ${errorData.error}`);
+      }
+
+      console.log('Employment equity data deleted');
+      setEmployees([]);
+      setEmploymentData({
+        totalEmployees: 0,
+        blackEmployees: 0,
+        blackFemaleEmployees: 0,
+        disabledEmployees: 0,
+        foreignEmployees: 0,
+        byOccupationalLevel: occupationalLevels.reduce((acc, level) => {
+          acc[level] = {
+            total: 0,
+            black: 0,
+            blackFemale: 0,
+            disabled: 0,
+          };
+          return acc;
+        }, {}),
+      });
+    } catch (error) {
+      console.error('Error deleting employment equity data:', error);
+      alert(`Failed to delete: ${error.message}`);
     }
   };
 
@@ -267,7 +332,7 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
                 <label className="block text-sm font-medium mb-1">Gender</label>
                 <select
                   name="gender"
-                  value={newEmployee.gender}
+                  value={newEmployee.race}
                   onChange={handleEmployeeChange}
                   className="w-full p-2 border rounded"
                 >
@@ -392,12 +457,12 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
                             Edit
                           </button>
                           <button
-                            type="button"
-                            onClick={() => deleteEmployee(index)}
-                            className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
-                          >
-                            Delete
-                          </button>
+              type="button"
+              onClick={deleteEmploymentEquity}
+              className="bg-red-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-red-700 w-full sm:w-auto transition-all duration-200"
+            >
+              Delete
+            </button>
                         </td>
                       </tr>
                     ))}

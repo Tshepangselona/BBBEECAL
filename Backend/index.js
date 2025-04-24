@@ -270,135 +270,282 @@ app.get('/test', (req, res) => {
   res.status(200).json({ message: 'Test route working' });
 });
 
-// Management Control Table - Create (unchanged)
-app.post("/management-control", async (req, res) => {
-  console.log("Management control POST hit with body:", req.body);
+// Management Control - Create
+app.post('/management-control', async (req, res) => {
+  console.log('Management control POST hit with body:', req.body);
   const { userId, managers, managementData } = req.body;
 
   try {
     if (!userId) {
-      console.log("Missing userId");
-      return res.status(400).json({ error: "User ID is required" });
+      console.log('Missing userId');
+      return res.status(400).json({ error: 'User ID is required' });
     }
     if (!managers || !Array.isArray(managers)) {
-      console.log("Invalid managers data");
-      return res.status(400).json({ error: "Managers must be an array" });
+      console.log('Invalid managers data');
+      return res.status(400).json({ error: 'Managers must be an array' });
+    }
+    if (!managementData || typeof managementData !== 'object') {
+      console.log('Invalid managementData');
+      return res.status(400).json({ error: 'Management data must be an object' });
     }
 
-    const userDoc = await getDoc(doc(db, "users", userId));
-    if (!userDoc.exists()) {
-      console.log("User not found for userId:", userId);
-      return res.status(404).json({ error: "User not found" });
+    const userDoc = await adminDb.collection('users').doc(userId).get();
+    if (!userDoc.exists) {
+      console.log('User not found for userId:', userId);
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const managementRef = adminDb.collection('managementControl');
+    const q = await managementRef.where('userId', '==', userId).get();
+    if (!q.empty) {
+      console.log('Management control already exists for userId:', userId);
+      return res.status(409).json({
+        error: 'Management control already exists for this user. Use PUT to update.',
+        existingId: q.docs[0].id,
+      });
     }
 
     const managementControlData = {
       userId,
-      managers: managers.map(manager => ({
-        name: manager.name,
-        siteLocation: manager.siteLocation || "",
-        idNumber: manager.idNumber,
-        position: manager.position,
-        jobTitle: manager.jobTitle || "",
-        race: manager.race || "",
-        gender: manager.gender || "",
-        isDisabled: manager.isDisabled || false,
+      managers: managers.map((manager) => ({
+        name: manager.name || '',
+        siteLocation: manager.siteLocation || '',
+        idNumber: manager.idNumber || '',
+        position: manager.position || '',
+        jobTitle: manager.jobTitle || '',
+        race: manager.race || '',
+        gender: manager.gender || '',
+        isDisabled: Boolean(manager.isDisabled),
         votingRights: Number(manager.votingRights) || 0,
-        isExecutiveDirector: manager.isExecutiveDirector || false,
-        isIndependentNonExecutive: manager.isIndependentNonExecutive || false
+        isExecutiveDirector: Boolean(manager.isExecutiveDirector),
+        isIndependentNonExecutive: Boolean(manager.isIndependentNonExecutive),
       })),
       managementData: {
         totalVotingRights: Number(managementData.totalVotingRights) || 0,
         blackVotingRights: Number(managementData.blackVotingRights) || 0,
         blackFemaleVotingRights: Number(managementData.blackFemaleVotingRights) || 0,
-        disabledVotingRights: Number(managementData.disabledVotingRights) || 0
+        disabledVotingRights: Number(managementData.disabledVotingRights) || 0,
       },
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
 
-    const docRef = await addDoc(collection(db, "managementControl"), managementControlData);
+    console.log('Attempting to write to managementControl for userId:', userId);
+    const docRef = await adminDb.collection('managementControl').add(managementControlData);
+    console.log('Write successful, doc ID:', docRef.id);
 
     res.status(201).json({
-      message: "Management control data saved successfully",
+      message: 'Management control data saved successfully',
       id: docRef.id,
-      ...managementControlData
+      ...managementControlData,
     });
   } catch (error) {
-    console.error("Detailed error:", error);
+    console.error('Detailed error in POST /management-control:', error.message, error.stack);
     res.status(400).json({ error: error.message, code: error.code });
   }
 });
 
-// Management Control - Retrieve (unchanged)
-app.get("/management-control/:userId", async (req, res) => {  
+// Management Control - Retrieve
+app.get('/management-control/:userId', async (req, res) => {
+  console.log('Management control GET hit with userId:', req.params.userId);
   const { userId } = req.params;
 
   try {
-    const managementRef = collection(db, "managementControl");
-    const q = query(managementRef, where("userId", "==", userId));
-    const querySnapshot = await getDocs(q);
-    
-    const managementRecords = [];
-    querySnapshot.forEach((doc) => {
-      managementRecords.push({
-        id: doc.id,
-        ...doc.data()
-      });
-    });
-
-    if (managementRecords.length === 0) {
-      return res.status(404).json({ message: "No management control data found for this user" });
+    if (!userId) {
+      console.log('Missing userId in GET request');
+      return res.status(400).json({ error: 'User ID is required' });
     }
 
+    const querySnapshot = await adminDb.collection('managementControl').where('userId', '==', userId).get();
+    const managementRecords = querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
+    if (managementRecords.length === 0) {
+      console.log('No management control data found for userId:', userId);
+      return res.status(404).json({ message: 'No management control data found for this user' });
+    }
+
+    console.log('Management control data retrieved for userId:', userId);
     res.status(200).json({
-      message: "Management control data retrieved successfully",
-      data: managementRecords
+      message: 'Management control data retrieved successfully',
+      data: managementRecords,
     });
   } catch (error) {
-    console.error("Management control retrieval error:", error.code, error.message);
-    res.status(500).json({ error: error.message, code: error.code });
+    console.error('Management control retrieval error:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to retrieve management control data', code: error.code });
   }
 });
 
-// Employment Equity - Create (unchanged)
-app.post("/employment-equity", async (req, res) => {
-  console.log("Employment equity POST hit with body:", req.body);
+// Management Control - Update
+app.put('/management-control/:id', async (req, res) => {
+  console.log('Management control PUT hit with body:', req.body);
+  const { id } = req.params;
+  const { userId, managers, managementData } = req.body;
+
+  try {
+    if (!userId) {
+      console.log('Validation failed: Missing userId');
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+    if (!managers || !Array.isArray(managers)) {
+      console.log('Validation failed: Managers is not an array or missing', { managers });
+      return res.status(400).json({ error: 'Managers must be an array' });
+    }
+    if (!managementData || typeof managementData !== 'object') {
+      console.log('Validation failed: ManagementData is not an object or missing', { managementData });
+      return res.status(400).json({ error: 'Management data must be an object' });
+    }
+
+    const userDoc = await adminDb.collection('users').doc(userId).get();
+    if (!userDoc.exists) {
+      console.log('User not found for userId:', userId);
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const docRef = adminDb.collection('managementControl').doc(id);
+    const existingDoc = await docRef.get();
+    if (!existingDoc.exists) {
+      console.log('Management control data not found for id:', id);
+      return res.status(404).json({ error: 'Management control data not found' });
+    }
+
+    const managementControlData = {
+      userId,
+      managers: managers.map((manager) => ({
+        name: manager.name || '',
+        siteLocation: manager.siteLocation || '',
+        idNumber: manager.idNumber || '',
+        position: manager.position || '',
+        jobTitle: manager.jobTitle || '',
+        race: manager.race || '',
+        gender: manager.gender || '',
+        isDisabled: Boolean(manager.isDisabled),
+        votingRights: Number(manager.votingRights) || 0,
+        isExecutiveDirector: Boolean(manager.isExecutiveDirector),
+        isIndependentNonExecutive: Boolean(manager.isIndependentNonExecutive),
+      })),
+      managementData: {
+        totalVotingRights: Number(managementData.totalVotingRights) || 0,
+        blackVotingRights: Number(managementData.blackVotingRights) || 0,
+        blackFemaleVotingRights: Number(managementData.blackFemaleVotingRights) || 0,
+        disabledVotingRights: Number(managementData.disabledVotingRights) || 0,
+      },
+      updatedAt: new Date().toISOString(),
+    };
+
+    await docRef.update({
+      ...managementControlData,
+      createdAt: existingDoc.data().createdAt, // Preserve original createdAt
+    });
+
+    console.log('Management control data updated with ID:', id);
+    res.status(200).json({
+      message: 'Management control data updated successfully',
+      id,
+      ...managementControlData,
+    });
+  } catch (error) {
+    console.error('Detailed error in PUT /management-control:', {
+      message: error.message,
+      code: error.code,
+      stack: error.stack,
+      requestBody: req.body,
+    });
+    res.status(400).json({ error: error.message, code: error.code });
+  }
+});
+
+// Management Control - Delete
+app.delete('/management-control/:userId', async (req, res) => {
+  console.log('Management control DELETE hit with userId:', req.params.userId);
+  const { userId } = req.params;
+
+  try {
+    if (!userId) {
+      console.log('Missing userId in params');
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    const userDoc = await adminDb.collection('users').doc(userId).get();
+    if (!userDoc.exists) {
+      console.log('User not found for userId:', userId);
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const managementRef = adminDb.collection('managementControl');
+    const query = await managementRef.where('userId', '==', userId).get();
+
+    if (query.empty) {
+      console.log('No management control data found for userId:', userId);
+      return res.status(404).json({ error: 'Management control data not found for this user' });
+    }
+
+    const docToDelete = query.docs[0];
+    await adminDb.collection('managementControl').doc(docToDelete.id).delete();
+
+    console.log('Management control data deleted for userId:', userId);
+    res.status(200).json({
+      message: 'Management control data deleted successfully',
+      userId,
+      deletedDocId: docToDelete.id,
+    });
+  } catch (error) {
+    console.error('Detailed error in DELETE /management-control:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to delete management control data', details: error.message });
+  }
+});
+
+// Employment Equity - Create
+app.post('/employment-equity', async (req, res) => {
+  console.log('Employment equity POST hit with body:', req.body);
   const { userId, employees, employmentData } = req.body;
 
   try {
     if (!userId) {
-      console.log("Missing userId");
-      return res.status(400).json({ error: "User ID is required" });
+      console.log('Missing userId');
+      return res.status(400).json({ error: 'User ID is required' });
     }
     if (!employees || !Array.isArray(employees)) {
-      console.log("Invalid employees data");
-      return res.status(400).json({ error: "Employees must be an array" });
+      console.log('Invalid employees data');
+      return res.status(400).json({ error: 'Employees must be an array' });
     }
     if (!employmentData || typeof employmentData !== 'object') {
-      console.log("Invalid employmentData");
-      return res.status(400).json({ error: "Employment data must be an object" });
+      console.log('Invalid employmentData');
+      return res.status(400).json({ error: 'Employment data must be an object' });
     }
 
-    const userDoc = await getDoc(doc(db, "users", userId));
-    if (!userDoc.exists()) {
-      console.log("User not found for userId:", userId);
-      return res.status(404).json({ error: "User not found" });
+    const userDoc = await adminDb.collection('users').doc(userId).get();
+    if (!userDoc.exists) {
+      console.log('User not found for userId:', userId);
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const employmentRef = adminDb.collection('employmentEquityDetails');
+    const q = await employmentRef.where('userId', '==', userId).get();
+    if (!q.empty) {
+      console.log('Employment equity already exists for userId:', userId);
+      return res.status(409).json({
+        error: 'Employment equity already exists for this user. Use PUT to update.',
+        existingId: q.docs[0].id,
+      });
     }
 
     const employmentEquityData = {
       userId,
-      employees: employees.map(employee => ({
-        name: employee.name || "",
-        siteLocation: employee.siteLocation || "",
-        idNumber: employee.idNumber || "",
-        jobTitle: employee.jobTitle || "",
-        race: employee.race || "",
-        gender: employee.gender || "",
+      employees: employees.map((employee) => ({
+        name: employee.name || '',
+        siteLocation: employee.siteLocation || '',
+        idNumber: employee.idNumber || '',
+        jobTitle: employee.jobTitle || '',
+        race: employee.race || '',
+        gender: employee.gender || '',
         isDisabled: Boolean(employee.isDisabled),
-        descriptionOfDisability: employee.descriptionOfDisability || "",
+        descriptionOfDisability: employee.descriptionOfDisability || '',
         isForeign: Boolean(employee.isForeign),
-        occupationalLevel: employee.occupationalLevel || "",
-        grossMonthlySalary: Number(employee.grossMonthlySalary) || 0
+        occupationalLevel: employee.occupationalLevel || '',
+        grossMonthlySalary: Number(employee.grossMonthlySalary) || 0,
       })),
       employmentData: {
         totalEmployees: Number(employmentData.totalEmployees) || 0,
@@ -406,56 +553,179 @@ app.post("/employment-equity", async (req, res) => {
         blackFemaleEmployees: Number(employmentData.blackFemaleEmployees) || 0,
         disabledEmployees: Number(employmentData.disabledEmployees) || 0,
         foreignEmployees: Number(employmentData.foreignEmployees) || 0,
-        byOccupationalLevel: employmentData.byOccupationalLevel || {}
+        byOccupationalLevel: employmentData.byOccupationalLevel || {},
       },
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
 
-    const docRef = await addDoc(collection(db, "employmentEquity"), employmentEquityData);
+    const docRef = await adminDb.collection('employmentEquityDetails').add(employmentEquityData);
+    console.log('Write successful, doc ID:', docRef.id);
 
     res.status(201).json({
-      message: "Employment equity data saved successfully",
+      message: 'Employment equity data saved successfully',
       id: docRef.id,
-      ...employmentEquityData
+      ...employmentEquityData,
     });
   } catch (error) {
-    console.error("Detailed error:", error);
+    console.error('Detailed error in POST /employment-equity:', error.message, error.stack);
     res.status(400).json({ error: error.message, code: error.code });
   }
 });
 
-// Employment Equity - Retrieve (unchanged)
-app.get("/employment-equity/:userId", async (req, res) => {
+// Employment Equity - Retrieve
+app.get('/employment-equity/:userId', async (req, res) => {
+  console.log('Employment equity GET hit with userId:', req.params.userId);
   const { userId } = req.params;
 
   try {
-    const employmentRef = collection(db, "employmentEquity");
-    const q = query(employmentRef, where("userId", "==", userId));
-    const querySnapshot = await getDocs(q);
-    
-    const employmentRecords = [];
-    querySnapshot.forEach((doc) => {
-      employmentRecords.push({
-        id: doc.id,
-        ...doc.data()
-      });
-    });
-
-    if (employmentRecords.length === 0) {
-      return res.status(404).json({ message: "No employment equity data found for this user" });
+    if (!userId) {
+      console.log('Missing userId in GET request');
+      return res.status(400).json({ error: 'User ID is required' });
     }
 
+    const querySnapshot = await adminDb.collection('employmentEquityDetails').where('userId', '==', userId).get();
+    const employmentRecords = querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
+    if (employmentRecords.length === 0) {
+      console.log('No employment equity data found for userId:', userId);
+      return res.status(404).json({ message: 'No employment equity data found for this user' });
+    }
+
+    console.log('Employment equity data retrieved for userId:', userId);
     res.status(200).json({
-      message: "Employment equity data retrieved successfully",
-      data: employmentRecords
+      message: 'Employment equity data retrieved successfully',
+      data: employmentRecords,
     });
   } catch (error) {
-    console.error("Employment equity retrieval error:", error.code, error.message);
-    res.status(500).json({ error: error.message, code: error.code });
+    console.error('Employment equity retrieval error:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to retrieve employment equity data', code: error.code });
   }
 });
 
+// Employment Equity - Update
+app.put('/employment-equity/:id', async (req, res) => {
+  console.log('Employment equity PUT hit with body:', req.body);
+  const { id } = req.params;
+  const { userId, employees, employmentData } = req.body;
+
+  try {
+    if (!userId) {
+      console.log('Validation failed: Missing userId');
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+    if (!employees || !Array.isArray(employees)) {
+      console.log('Validation failed: Employees is not an array or missing', { employees });
+      return res.status(400).json({ error: 'Employees must be an array' });
+    }
+    if (!employmentData || typeof employmentData !== 'object') {
+      console.log('Validation failed: EmploymentData is not an object or missing', { employmentData });
+      return res.status(400).json({ error: 'Employment data must be an object' });
+    }
+
+    const userDoc = await adminDb.collection('users').doc(userId).get();
+    if (!userDoc.exists) {
+      console.log('User not found for userId:', userId);
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const docRef = adminDb.collection('employmentEquityDetails').doc(id);
+    const existingDoc = await docRef.get();
+    if (!existingDoc.exists) {
+      console.log('Employment equity data not found for id:', id);
+      return res.status(404).json({ error: 'Employment equity data not found' });
+    }
+
+    const employmentEquityData = {
+      userId,
+      employees: employees.map((employee) => ({
+        name: employee.name || '',
+        siteLocation: employee.siteLocation || '',
+        idNumber: employee.idNumber || '',
+        jobTitle: employee.jobTitle || '',
+        race: employee.race || '',
+        gender: employee.gender || '',
+        isDisabled: Boolean(employee.isDisabled),
+        descriptionOfDisability: employee.descriptionOfDisability || '',
+        isForeign: Boolean(employee.isForeign),
+        occupationalLevel: employee.occupationalLevel || '',
+        grossMonthlySalary: Number(employee.grossMonthlySalary) || 0,
+      })),
+      employmentData: {
+        totalEmployees: Number(employmentData.totalEmployees) || 0,
+        blackEmployees: Number(employmentData.blackEmployees) || 0,
+        blackFemaleEmployees: Number(employmentData.blackFemaleEmployees) || 0,
+        disabledEmployees: Number(employmentData.disabledEmployees) || 0,
+        foreignEmployees: Number(employmentData.foreignEmployees) || 0,
+        byOccupationalLevel: employmentData.byOccupationalLevel || {},
+      },
+      updatedAt: new Date().toISOString(),
+    };
+
+    await docRef.update({
+      ...employmentEquityData,
+      createdAt: existingDoc.data().createdAt, // Preserve original createdAt
+    });
+
+    console.log('Employment equity data updated with ID:', id);
+    res.status(200).json({
+      message: 'Employment equity data updated successfully',
+      id,
+      ...employmentEquityData,
+    });
+  } catch (error) {
+    console.error('Detailed error in PUT /employment-equity:', {
+      message: error.message,
+      code: error.code,
+      stack: error.stack,
+      requestBody: req.body,
+    });
+    res.status(400).json({ error: error.message, code: error.code });
+  }
+});
+
+// Employment Equity - Delete
+app.delete('/employment-equity/:userId', async (req, res) => {
+  console.log('Employment equity DELETE hit with userId:', req.params.userId);
+  const { userId } = req.params;
+
+  try {
+    if (!userId) {
+      console.log('Missing userId in params');
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    const userDoc = await adminDb.collection('users').doc(userId).get();
+    if (!userDoc.exists) {
+      console.log('User not found for userId:', userId);
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const employmentRef = adminDb.collection('employmentEquityDetails');
+    const query = await employmentRef.where('userId', '==', userId).get();
+
+    if (query.empty) {
+      console.log('No employment equity data found for userId:', userId);
+      return res.status(404).json({ error: 'Employment equity data not found for this user' });
+    }
+
+    const docToDelete = query.docs[0];
+    await adminDb.collection('employmentEquityDetails').doc(docToDelete.id).delete();
+
+    console.log('Employment equity data deleted for userId:', userId);
+    res.status(200).json({
+      message: 'Employment equity data deleted successfully',
+      userId,
+      deletedDocId: docToDelete.id,
+    });
+  } catch (error) {
+    console.error('Detailed error in DELETE /employment-equity:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to delete employment equity data', details: error.message });
+  }
+});
 // Yes 4 Youth Initiative - Create (unchanged)
 app.post("/yes4youth-initiative", async (req, res) => {
   console.log("Yes 4 Youth Initiative POST hit with body:", req.body);
