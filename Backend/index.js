@@ -726,100 +726,236 @@ app.delete('/employment-equity/:userId', async (req, res) => {
     res.status(500).json({ error: 'Failed to delete employment equity data', details: error.message });
   }
 });
-// Yes 4 Youth Initiative - Create (unchanged)
-app.post("/yes4youth-initiative", async (req, res) => {
-  console.log("Yes 4 Youth Initiative POST hit with body:", req.body);
+
+// Yes 4 Youth Initiative - Create
+app.post('/yes4youth-initiative', async (req, res) => {
+  console.log('Yes 4 Youth Initiative POST hit with body:', req.body);
   const { userId, participants, yesData } = req.body;
 
   try {
     if (!userId) {
-      console.log("Missing userId");
-      return res.status(400).json({ error: "User ID is required" });
+      console.log('Missing userId');
+      return res.status(400).json({ error: 'User ID is required' });
     }
     if (!participants || !Array.isArray(participants)) {
-      console.log("Invalid participants data");
-      return res.status(400).json({ error: "Participants must be an array" });
+      console.log('Invalid participants data');
+      return res.status(400).json({ error: 'Participants must be an array' });
     }
     if (!yesData || typeof yesData !== 'object') {
-      console.log("Invalid yesData");
-      return res.status(400).json({ error: "YES data must be an object" });
+      console.log('Invalid yesData');
+      return res.status(400).json({ error: 'YES data must be an object' });
     }
 
-    const userDoc = await getDoc(doc(db, "users", userId));
-    if (!userDoc.exists()) {
-      console.log("User not found for userId:", userId);
-      return res.status(404).json({ error: "User not found" });
+    const userDoc = await adminDb.collection('users').doc(userId).get();
+    if (!userDoc.exists) {
+      console.log('User not found for userId:', userId);
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const yesRef = adminDb.collection('yes4YouthInitiative');
+    const q = await yesRef.where('userId', '==', userId).get();
+    if (!q.empty) {
+      console.log('YES initiative already exists for userId:', userId);
+      return res.status(409).json({
+        error: 'YES initiative already exists for this user. Use PUT to update.',
+        existingId: q.docs[0].id,
+      });
     }
 
     const yes4YouthInitiativeData = {
       userId,
-      participants: participants.map(participant => ({
-        name: participant.name || "",
-        siteLocation: participant.siteLocation || "",
-        idNumber: participant.idNumber || "",
-        jobTitle: participant.jobTitle || "",
-        race: participant.race || "",
-        gender: participant.gender || "",
-        occupationalLevel: participant.occupationalLevel || "",
-        hostEmployerYear: participant.hostEmployerYear || "",
+      participants: participants.map((participant) => ({
+        name: participant.name || '',
+        siteLocation: participant.siteLocation || '',
+        idNumber: participant.idNumber || '',
+        jobTitle: participant.jobTitle || '',
+        race: participant.race || '',
+        gender: participant.gender || '',
+        occupationalLevel: participant.occupationalLevel || '',
+        hostEmployerYear: participant.hostEmployerYear || '',
         monthlyStipend: Number(participant.monthlyStipend) || 0,
-        startDate: participant.startDate || "",
-        endDate: participant.endDate || "",
+        startDate: participant.startDate || '',
+        endDate: participant.endDate || '',
         isCurrentYesEmployee: Boolean(participant.isCurrentYesEmployee),
-        isCompletedYesAbsorbed: Boolean(participant.isCompletedYesAbsorbed)
+        isCompletedYesAbsorbed: Boolean(participant.isCompletedYesAbsorbed),
       })),
       yesData: {
         totalParticipants: Number(yesData.totalParticipants) || 0,
         blackYouthParticipants: Number(yesData.blackYouthParticipants) || 0,
         totalStipendPaid: Number(yesData.totalStipendPaid) || 0,
         currentYesEmployees: Number(yesData.currentYesEmployees) || 0,
-        completedYesAbsorbed: Number(yesData.completedYesAbsorbed) || 0
+        completedYesAbsorbed: Number(yesData.completedYesAbsorbed) || 0,
       },
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
 
-    const docRef = await addDoc(collection(db, "yes4YouthInitiative"), yes4YouthInitiativeData);
+    const docRef = await adminDb.collection('yes4YouthInitiative').add(yes4YouthInitiativeData);
+    console.log('Write successful, doc ID:', docRef.id);
 
     res.status(201).json({
-      message: "YES 4 Youth Initiative data saved successfully",
+      message: 'YES 4 Youth Initiative data saved successfully',
       id: docRef.id,
-      ...yes4YouthInitiativeData
+      ...yes4YouthInitiativeData,
     });
   } catch (error) {
-    console.error("Detailed error:", error);
+    console.error('Detailed error in POST /yes4youth-initiative:', error.message, error.stack);
     res.status(400).json({ error: error.message, code: error.code });
   }
 });
 
-// Yes 4 Youth Initiative - Retrieve (unchanged)
-app.get("/yes4youth-initiative/:userId", async (req, res) => {
+// Yes 4 Youth Initiative - Retrieve
+app.get('/yes4youth-initiative/:userId', async (req, res) => {
+  console.log('Yes 4 Youth Initiative GET hit with userId:', req.params.userId);
   const { userId } = req.params;
 
   try {
-    const yesRef = collection(db, "yes4YouthInitiative");
-    const q = query(yesRef, where("userId", "==", userId));
-    const querySnapshot = await getDocs(q);
-    
-    const yesRecords = [];
-    querySnapshot.forEach((doc) => {
-      yesRecords.push({
-        id: doc.id,
-        ...doc.data()
-      });
-    });
-
-    if (yesRecords.length === 0) {
-      return res.status(404).json({ message: "No YES 4 Youth Initiative data found for this user" });
+    if (!userId) {
+      console.log('Missing userId in GET request');
+      return res.status(400).json({ error: 'User ID is required' });
     }
 
+    const querySnapshot = await adminDb.collection('yes4YouthInitiative').where('userId', '==', userId).get();
+    const yesRecords = querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
+    if (yesRecords.length === 0) {
+      console.log('No YES initiative data found for userId:', userId);
+      return res.status(404).json({ message: 'No YES 4 Youth Initiative data found for this user' });
+    }
+
+    console.log('YES initiative data retrieved for userId:', userId);
     res.status(200).json({
-      message: "YES 4 Youth Initiative data retrieved successfully",
-      data: yesRecords
+      message: 'YES 4 Youth Initiative data retrieved successfully',
+      data: yesRecords,
     });
   } catch (error) {
-    console.error("YES 4 Youth Initiative retrieval error:", error.code, error.message);
-    res.status(500).json({ error: error.message, code: error.code });
+    console.error('YES initiative retrieval error:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to retrieve YES 4 Youth Initiative data', code: error.code });
+  }
+});
+
+// Yes 4 Youth Initiative - Update
+app.put('/yes4youth-initiative/:id', async (req, res) => {
+  console.log('Yes 4 Youth Initiative PUT hit with body:', req.body);
+  const { id } = req.params;
+  const { userId, participants, yesData } = req.body;
+
+  try {
+    if (!userId) {
+      console.log('Validation failed: Missing userId');
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+    if (!participants || !Array.isArray(participants)) {
+      console.log('Validation failed: Participants is not an array or missing', { participants });
+      return res.status(400).json({ error: 'Participants must be an array' });
+    }
+    if (!yesData || typeof yesData !== 'object') {
+      console.log('Validation failed: YesData is not an object or missing', { yesData });
+      return res.status(400).json({ error: 'YES data must be an object' });
+    }
+
+    const userDoc = await adminDb.collection('users').doc(userId).get();
+    if (!userDoc.exists) {
+      console.log('User not found for userId:', userId);
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const docRef = adminDb.collection('yes4YouthInitiative').doc(id);
+    const existingDoc = await docRef.get();
+    if (!existingDoc.exists) {
+      console.log('YES initiative data not found for id:', id);
+      return res.status(404).json({ error: 'YES 4 Youth Initiative data not found' });
+    }
+
+    const yes4YouthInitiativeData = {
+      userId,
+      participants: participants.map((participant) => ({
+        name: participant.name || '',
+        siteLocation: participant.siteLocation || '',
+        idNumber: participant.idNumber || '',
+        jobTitle: participant.jobTitle || '',
+        race: participant.race || '',
+        gender: participant.gender || '',
+        occupationalLevel: participant.occupationalLevel || '',
+        hostEmployerYear: participant.hostEmployerYear || '',
+        monthlyStipend: Number(participant.monthlyStipend) || 0,
+        startDate: participant.startDate || '',
+        endDate: participant.endDate || '',
+        isCurrentYesEmployee: Boolean(participant.isCurrentYesEmployee),
+        isCompletedYesAbsorbed: Boolean(participant.isCompletedYesAbsorbed),
+      })),
+      yesData: {
+        totalParticipants: Number(yesData.totalParticipants) || 0,
+        blackYouthParticipants: Number(yesData.blackYouthParticipants) || 0,
+        totalStipendPaid: Number(yesData.totalStipendPaid) || 0,
+        currentYesEmployees: Number(yesData.currentYesEmployees) || 0,
+        completedYesAbsorbed: Number(yesData.completedYesAbsorbed) || 0,
+      },
+      updatedAt: new Date().toISOString(),
+    };
+
+    await docRef.update({
+      ...yes4YouthInitiativeData,
+      createdAt: existingDoc.data().createdAt, // Preserve original createdAt
+    });
+
+    console.log('YES 4 Youth Initiative data updated with ID:', id);
+    res.status(200).json({
+      message: 'YES 4 Youth Initiative data updated successfully',
+      id,
+      ...yes4YouthInitiativeData,
+    });
+  } catch (error) {
+    console.error('Detailed error in PUT /yes4youth-initiative:', {
+      message: error.message,
+      code: error.code,
+      stack: error.stack,
+      requestBody: req.body,
+    });
+    res.status(400).json({ error: error.message, code: error.code });
+  }
+});
+
+// Yes 4 Youth Initiative - Delete
+app.delete('/yes4youth-initiative/:userId', async (req, res) => {
+  console.log('Yes 4 Youth Initiative DELETE hit with userId:', req.params.userId);
+  const { userId } = req.params;
+
+  try {
+    if (!userId) {
+      console.log('Missing userId in params');
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    const userDoc = await adminDb.collection('users').doc(userId).get();
+    if (!userDoc.exists) {
+      console.log('User not found for userId:', userId);
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const yesRef = adminDb.collection('yes4YouthInitiative');
+    const query = await yesRef.where('userId', '==', userId).get();
+
+    if (query.empty) {
+      console.log('No YES initiative data found for userId:', userId);
+      return res.status(404).json({ error: 'YES 4 Youth Initiative data not found for this user' });
+    }
+
+    const docToDelete = query.docs[0];
+    await adminDb.collection('yes4YouthInitiative').doc(docToDelete.id).delete();
+
+    console.log('YES initiative data deleted for userId:', userId);
+    res.status(200).json({
+      message: 'YES 4 Youth Initiative data deleted successfully',
+      userId,
+      deletedDocId: docToDelete.id,
+    });
+  } catch (error) {
+    console.error('Detailed error in DELETE /yes4youth-initiative:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to delete YES 4 Youth Initiative data', details: error.message });
   }
 });
 

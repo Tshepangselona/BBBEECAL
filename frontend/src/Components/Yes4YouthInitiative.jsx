@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
   const occupationalLevels = [
@@ -7,7 +7,7 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
     'Senior Management',
     'Middle Management',
     'Junior Management',
-    'Other, Semi-Skilled & Unskilled'
+    'Other, Semi-Skilled & Unskilled',
   ];
 
   const [participants, setParticipants] = useState([]);
@@ -24,23 +24,46 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
     startDate: '',
     endDate: '',
     isCurrentYesEmployee: false,
-    isCompletedYesAbsorbed: false
+    isCompletedYesAbsorbed: false,
   });
-  const [editingParticipantIndex, setEditingParticipantIndex] = useState(null); // New state for editing
-
+  const [editingParticipantIndex, setEditingParticipantIndex] = useState(null);
   const [yesData, setYesData] = useState({
     totalParticipants: 0,
     blackYouthParticipants: 0,
     totalStipendPaid: 0,
     currentYesEmployees: 0,
-    completedYesAbsorbed: 0
+    completedYesAbsorbed: 0,
   });
+
+  // Fetch existing data on mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await fetch(`http://localhost:5000/yes4youth-initiative/${userId}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (response.ok) {
+          const { data } = await response.json();
+          if (data.length > 0) {
+            setParticipants(data[0].participants);
+            setYesData(data[0].yesData);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching YES initiative data:', error);
+      }
+    };
+
+    if (userId) fetchData();
+  }, [userId]);
 
   const handleParticipantChange = (e) => {
     const { name, value, type, checked } = e.target;
     setNewParticipant({
       ...newParticipant,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: type === 'checkbox' ? checked : value,
     });
   };
 
@@ -76,11 +99,6 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
     recalculateYesData(updatedParticipants);
   };
 
-  const deleteParticipant = (index) => {
-    const updatedParticipants = participants.filter((_, i) => i !== index);
-    setParticipants(updatedParticipants);
-    recalculateYesData(updatedParticipants);
-  };
 
   const resetNewParticipant = () => {
     setNewParticipant({
@@ -96,7 +114,7 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
       startDate: '',
       endDate: '',
       isCurrentYesEmployee: false,
-      isCompletedYesAbsorbed: false
+      isCompletedYesAbsorbed: false,
     });
   };
 
@@ -125,7 +143,7 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
       blackYouthParticipants,
       totalStipendPaid,
       currentYesEmployees,
-      completedYesAbsorbed
+      completedYesAbsorbed,
     });
   };
 
@@ -134,27 +152,39 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
     console.log('Submitting data:', { userId, participants, yesData });
 
     if (!userId) {
-      console.log('User ID is missing!');
       alert('User ID is missing. Please ensure you are logged in.');
       return;
     }
 
     try {
-      const response = await fetch('http://localhost:5000/yes4youth-initiative', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId,
-          participants,
-          yesData,
-        }),
+      // Check if data exists to determine POST or PUT
+      const checkResponse = await fetch(`http://localhost:5000/yes4youth-initiative/${userId}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      let method = 'POST';
+      let url = 'http://localhost:5000/yes4youth-initiative';
+      let existingId = null;
+
+      if (checkResponse.ok) {
+        const { data } = await checkResponse.json();
+        if (data.length > 0) {
+          method = 'PUT';
+          existingId = data[0].id;
+          url = `http://localhost:5000/yes4youth-initiative/${existingId}`;
+        }
+      }
+
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, participants, yesData }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save YES initiative data');
+        throw new Error(`Failed to save YES initiative data: ${errorData.error || 'Unknown error'}`);
       }
 
       const result = await response.json();
@@ -162,8 +192,35 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
       onSubmit({ participants, yesData });
       onClose();
     } catch (error) {
-      console.error('Error submitting YES initiative:', error);
+      console.error('Error saving YES initiative data:', error);
       alert(`Failed to save YES initiative data: ${error.message}`);
+    }
+  };
+
+  const deleteYesInitiative = async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/yes4youth-initiative/${userId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Failed to delete YES initiative data: ${errorData.error}`);
+      }
+
+      console.log('YES initiative data deleted');
+      setParticipants([]);
+      setYesData({
+        totalParticipants: 0,
+        blackYouthParticipants: 0,
+        totalStipendPaid: 0,
+        currentYesEmployees: 0,
+        completedYesAbsorbed: 0,
+      });
+    } catch (error) {
+      console.error('Error deleting YES initiative data:', error);
+      alert(`Failed to delete: ${error.message}`);
     }
   };
 
@@ -390,10 +447,10 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
                           </button>
                           <button
                             type="button"
-                            onClick={() => deleteParticipant(index)}
-                            className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
+                            onClick={deleteYesInitiative}
+                            className="bg-red-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-red-700 w-full sm:w-auto transition-all duration-200"
                           >
-                            Delete
+                            Delete YES Initiative Details
                           </button>
                         </td>
                       </tr>
@@ -468,7 +525,7 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
               type="submit"
               className="bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-blue-700 w-full sm:w-auto transition-all duration-200"
             >
-              Save Youth Details
+              Save YES Initiative Details
             </button>
           </div>
         </form>
