@@ -7,14 +7,20 @@ import {
 import SignUp from "./Components/Forms/SignUp";
 import Login from "./Components/Forms/Login";
 import Home from "./Components/Home";
+import AdminDashboard from "./Admin/Pages/AdminDashboard";
+import AdminLogIn from "./Admin/Forms/AdminLogIn";
+import AdminSignUp from "./Admin/Forms/AdminSignUp";
+import LandingPage from "./LandingPage";
 
 const router = createBrowserRouter(
   createRoutesFromElements(
     <>
-    <Route index='/SignUp' element={<SignUp />} />
+    <Route index='/LandingPage' element={<LandingPage />} />
     <Route path='/SignUp' element={<SignUp />} />
     <Route path='/Login' element={<Login />} />
-    <Route path='/Home' element={<Home />} />
+    <Route path='/AdminDashboard' element={<AdminDashboard />} />
+    <Route path='/AdminLogIn' element={<AdminLogIn />} />
+    <Route path='/AdminSignUp' element={<AdminSignUp />} />
     </>
   )
 )
