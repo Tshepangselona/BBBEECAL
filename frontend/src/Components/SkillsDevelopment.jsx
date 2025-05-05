@@ -1,32 +1,33 @@
-import React, { useState, useEffect } from "react";
-import axios from "axios"; // Ensure axios is installed: `npm install axios`
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import PropTypes from 'prop-types';
 
 const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
   const categories = [
-    { value: "A", label: "Bursaries: Institution-based, theoretical only, formally assessed (incl. Basic Education)" },
-    { value: "A2", label: "Institution-based, theoretical instruction alone – formally assessed by educational institutions established by or registered with the Department of Higher Education & Training" },
-    { value: "B", label: "Internships: Institution-based, theoretical & practical learning, formally assessed" },
-    { value: "C", label: "Learnerships: Recognised or registered structured experiential learning in the workplace that is required after achievement of qualification, formally assessed" },
-    { value: "D", label: "Learnerships or Apprenticeships: Occupationally directed instructional & workplace learning programme (formal contract), formally assessed" },
-    { value: "E", label: "Work-integrated Learning: Occupationally directed instructional & workplace learning programme (no formal contract required), formally assessed" },
-    { value: "F", label: "Informal Training: Occupationally-directed informal instructional programmes. (Institutions, conferences, meetings)" },
-    { value: "G", label: "Informal Training | Work-based informal programmes (workplace)" },
+    { value: 'A', label: 'Bursaries: Institution-based, theoretical only, formally assessed (incl. Basic Education)' },
+    { value: 'A2', label: 'Institution-based, theoretical instruction alone – formally assessed by educational institutions established by or registered with the Department of Higher Education & Training' },
+    { value: 'B', label: 'Internships: Institution-based, theoretical & practical learning, formally assessed' },
+    { value: 'C', label: 'Learnerships: Recognised or registered structured experiential learning in the workplace that is required after achievement of qualification, formally assessed' },
+    { value: 'D', label: 'Learnerships or Apprenticeships: Occupationally directed instructional & workplace learning programme (formal contract), formally assessed' },
+    { value: 'E', label: 'Work-integrated Learning: Occupationally directed instructional & workplace learning programme (no formal contract required), formally assessed' },
+    { value: 'F', label: 'Informal Training: Occupationally-directed informal instructional programmes. (Institutions, conferences, meetings)' },
+    { value: 'G', label: 'Informal Training | Work-based informal programmes (workplace)' },
   ];
 
   const [trainings, setTrainings] = useState([]);
   const [newTraining, setNewTraining] = useState({
-    startDate: "",
-    endDate: "",
-    trainingCourse: "",
-    trainerProvider: "",
-    category: "",
-    learnerName: "",
-    siteLocation: "",
-    idNumber: "",
-    race: "",
-    gender: "",
+    startDate: '',
+    endDate: '',
+    trainingCourse: '',
+    trainerProvider: '',
+    category: '',
+    learnerName: '',
+    siteLocation: '',
+    idNumber: '',
+    race: '',
+    gender: '',
     isDisabled: false,
-    coreCriticalSkills: "",
+    coreCriticalSkills: '',
     totalDirectExpenditure: 0,
     additionalExpenditure: 0,
     costToCompanySalary: 0,
@@ -35,8 +36,7 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
     isUnemployedLearner: false,
     isAbsorbedInternalTrainer: false,
   });
-  const [editingTrainingIndex, setEditingTrainingIndex] = useState(null); // New state for editing
-
+  const [editingTrainingIndex, setEditingTrainingIndex] = useState(null);
   const [summary, setSummary] = useState({
     totalTrainings: 0,
     totalDirectExpenditure: 0,
@@ -48,18 +48,22 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
     absorbedInternalTrainers: 0,
   });
 
-  // Fetch existing data when component mounts (optional)
   useEffect(() => {
+    console.log('SkillsDevelopment mounted with userId:', userId);
+    if (!userId) {
+      console.warn('SkillsDevelopment: userId prop is missing or undefined');
+    }
+
     const fetchSkillsData = async () => {
       try {
         const response = await axios.get(`http://localhost:5000/skills-development/${userId}`);
         const records = response.data.data;
         if (records.length > 0) {
-          setTrainings(records[0].trainings); // Assuming you want the first record's trainings
+          setTrainings(records[0].trainings);
           setSummary(records[0].summary);
         }
       } catch (error) {
-        console.error("Error fetching skills development data:", error);
+        console.error('Error fetching skills development data:', error);
       }
     };
     if (userId) fetchSkillsData();
@@ -69,13 +73,13 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
     const { name, value, type, checked } = e.target;
     setNewTraining({
       ...newTraining,
-      [name]: type === "checkbox" ? checked : value,
+      [name]: type === 'checkbox' ? checked : value,
     });
   };
 
   const addTraining = () => {
     if (!newTraining.startDate || !newTraining.trainingCourse || !newTraining.learnerName || !newTraining.idNumber || !newTraining.category) {
-      alert("Please fill in the Start Date, Training Course, Learner Name, ID Number, and Category.");
+      alert('Please fill in the Start Date, Training Course, Learner Name, ID Number, and Category.');
       return;
     }
 
@@ -92,7 +96,7 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
 
   const saveEditedTraining = () => {
     if (!newTraining.startDate || !newTraining.trainingCourse || !newTraining.learnerName || !newTraining.idNumber || !newTraining.category) {
-      alert("Please fill in the Start Date, Training Course, Learner Name, ID Number, and Category.");
+      alert('Please fill in the Start Date, Training Course, Learner Name, ID Number, and Category.');
       return;
     }
 
@@ -113,18 +117,18 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
 
   const resetNewTraining = () => {
     setNewTraining({
-      startDate: "",
-      endDate: "",
-      trainingCourse: "",
-      trainerProvider: "",
-      category: "",
-      learnerName: "",
-      siteLocation: "",
-      idNumber: "",
-      race: "",
-      gender: "",
+      startDate: '',
+      endDate: '',
+      trainingCourse: '',
+      trainerProvider: '',
+      category: '',
+      learnerName: '',
+      siteLocation: '',
+      idNumber: '',
+      race: '',
+      gender: '',
       isDisabled: false,
-      coreCriticalSkills: "",
+      coreCriticalSkills: '',
       totalDirectExpenditure: 0,
       additionalExpenditure: 0,
       costToCompanySalary: 0,
@@ -169,15 +173,60 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log('Submitting data:', { userId, trainings, summary });
+
+    if (!userId) {
+      console.error('handleSubmit: userId is missing. Ensure the user is logged in and userId is passed as a prop.');
+      alert('User ID is missing. Please ensure you are logged in and try again.');
+      return;
+    }
+
     try {
-      const payload = { userId, trainings, summary };
-      const response = await axios.post("http://localhost:5000/skills-development", payload);
-      console.log("Skills development data saved:", response.data);
-      onSubmit(payload); // Optional: Pass data to parent component
+      const checkResponse = await axios.get(`http://localhost:5000/skills-development/${userId}`);
+
+      let method = 'post';
+      let url = 'http://localhost:5000/skills-development';
+      if (checkResponse.data.data.length > 0) {
+        method = 'put';
+        const existingId = checkResponse.data.data[0].id;
+        url = `http://localhost:5000/skills-development/${existingId}`;
+      }
+
+      const response = await axios[method](url, { userId, trainings, summary });
+
+      console.log('Skills development data saved:', response.data);
+      onSubmit({ trainings, summary });
       onClose();
     } catch (error) {
-      console.error("Error saving skills development data:", error);
-      alert("Failed to save skills development data. Please try again.");
+      console.error('Error saving skills development data:', error);
+      alert(`Failed to save skills development data: ${error.response?.data?.error || error.message}`);
+    }
+  };
+
+  const deleteSkillsDevelopment = async () => {
+    if (!userId) {
+      console.error('deleteSkillsDevelopment: userId is missing.');
+      alert('User ID is missing. Please ensure you are logged in and try again.');
+      return;
+    }
+
+    try {
+      const response = await axios.delete(`http://localhost:5000/skills-development/${userId}`);
+      console.log('Skills development data deleted:', response.data);
+      setTrainings([]);
+      setSummary({
+        totalTrainings: 0,
+        totalDirectExpenditure: 0,
+        totalAdditionalExpenditure: 0,
+        totalCostToCompanySalary: 0,
+        totalTrainingHours: 0,
+        totalParticipants: 0,
+        unemployedLearners: 0,
+        absorbedInternalTrainers: 0,
+      });
+    } catch (error) {
+      console.error('Error deleting skills development data:', error);
+      alert(`Failed to delete: ${error.response?.data?.error || error.message}`);
     }
   };
 
@@ -364,7 +413,7 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
                   onChange={handleTrainingChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter salary"
-                  disabled // Read-only as per "Don't change formula"
+                  disabled
                 />
               </div>
               <div>
@@ -415,7 +464,7 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
               onClick={editingTrainingIndex !== null ? saveEditedTraining : addTraining}
               className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
             >
-              {editingTrainingIndex !== null ? "Save Edited Training" : "Add Training"}
+              {editingTrainingIndex !== null ? 'Save Edited Training' : 'Add Training'}
             </button>
           </div>
 
@@ -574,6 +623,7 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
             </div>
           </div>
 
+          {/* Buttons */}
           <div className="fixed bottom-4 sm:bottom-12 right-2 sm:right-4 md:right-78 flex flex-col sm:flex-row justify-end gap-2 sm:gap-4 bg-white p-3 sm:p-4 rounded-md shadow-lg w-[90%] sm:w-auto max-w-md">
             <button
               type="button"
@@ -582,6 +632,15 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
             >
               Cancel
             </button>
+            {trainings.length > 0 && (
+              <button
+                type="button"
+                onClick={deleteSkillsDevelopment}
+                className="bg-red-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-red-700 w-full sm:w-auto transition-all duration-200"
+              >
+                Delete Skills Development Details
+              </button>
+            )}
             <button
               type="submit"
               className="bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-blue-700 w-full sm:w-auto transition-all duration-200"
@@ -593,6 +652,12 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
       </div>
     </div>
   );
+};
+
+SkillsDevelopment.propTypes = {
+  userId: PropTypes.string.isRequired,
+  onClose: PropTypes.func.isRequired,
+  onSubmit: PropTypes.func.isRequired,
 };
 
 export default SkillsDevelopment;
