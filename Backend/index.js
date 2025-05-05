@@ -68,6 +68,194 @@ const validateDateFormat = (dateStr) => {
   return true;
 };
 
+// Admin Signup route 
+console.log("Registering /admin-signup endpoint");
+app.post("/admin-signup", async (req, res) => {
+  const { companymail, Employeename, contactNumber } = req.body;
+
+  console.log("Admin signup request body:", req.body);
+
+  try {
+    // Validate required fields
+    if (!companymail || !Employeename || !contactNumber) {
+      console.log("Missing required fields:", { companymail, Employeename, contactNumber });
+      return res.status(400).json({ error: "Company email, employee name, and contact number are required" });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(companymail)) {
+      console.log("Invalid email format:", companymail);
+      return res.status(400).json({ error: "Invalid company email format" });
+    }
+
+    // Validate contact number format (e.g., +27123456789)
+    const phoneRegex = /^\+\d{10,}$/;
+    if (!phoneRegex.test(contactNumber)) {
+      console.log("Invalid contact number format:", contactNumber);
+      return res.status(400).json({ error: "Invalid contact number format. Use e.g., +27123456789" });
+    }
+
+    // Generate a random password
+    const password = generatePassword();
+    console.log("Generated password for admin:", password);
+
+    // Create Firebase user
+    console.log("Creating Firebase admin user with:", { companymail, password });
+    const userCredential = await createUserWithEmailAndPassword(auth, companymail, password);
+    const user = userCredential.user;
+    console.log("Admin user created with UID:", user.uid);
+
+    // Save to Firestore admin collection
+    console.log("Saving admin to Firestore admin collection for UID:", user.uid);
+    await setDoc(doc(db, "admin", user.uid), {
+      Employeename,
+      contactNumber,
+      companymail,
+      createdAt: new Date().toISOString(),
+    });
+
+    // Generate password reset link
+    const resetLink = await admin.auth().generatePasswordResetLink(companymail);
+    console.log("Password reset link generated for admin:", resetLink);
+
+    // Send user email
+    console.log("Preparing to send admin user email to:", companymail);
+    const userEmail = new SibApiV3Sdk.SendSmtpEmail();
+    userEmail.sender = { name: 'Forge', email: process.env.ADMIN_EMAIL };
+    userEmail.to = [{ email: companymail }];
+    userEmail.subject = 'Forge Admin Account Created';
+    userEmail.htmlContent = `
+      <html>
+        <body style="font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+            <tr>
+              <td style="background-color: #4a90e2; padding: 20px; text-align: center; border-top-left-radius: 8px; border-top-right-radius: 8px;">
+                <h3 style="color: #ffffff; margin: 0; font-size: 24px;">Welcome, ${Employeename}!</h3>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 20px; color: #333333;">
+                <p style="font-size: 16px; line-height: 1.5;">Your admin account has been created successfully!</p>
+                <p style="font-size: 16px; line-height: 1.5;">Email: ${companymail}</p>
+                <p style="font-size: 16px; line-height: 1.5;">As an admin, you have access to manage BBBEE compliance data for Forge users. Please set your password to log in and start managing.</p>
+                <p style="font-size: 16px; line-height: 1.5;">If you have any questions, contact us at tebatsomoyaba@gmail.com.</p>
+                <p><a href="${resetLink}" style="color: #4a90e2; text-decoration: underline;">Set Your Password</a></p>
+                <p style="font-size: 14px; color: #777777; margin-top: 20px;">Best regards,<br><span style="color: #4a90e2; font-weight: bold;">Forge Academy</span></p>
+              </td>
+            </tr>
+            <tr>
+              <td style="background-color: #f4f4f4; padding: 10px; text-align: center; font-size: 12px; color: #999999; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;">
+                © ${new Date().getFullYear()} Forge. All rights reserved.
+              </td>
+            </tr>
+          </table>
+        </body>
+      </html>
+    `;
+
+    // Send admin notification email
+    console.log("Preparing to send admin notification email");
+    const adminEmail = new SibApiV3Sdk.SendSmtpEmail();
+    adminEmail.sender = { name: 'Forge', email: process.env.ADMIN_EMAIL };
+    adminEmail.to = [{ email: process.env.ADMIN_EMAIL }];
+    adminEmail.subject = 'New Admin Signup Notification';
+    adminEmail.htmlContent = `
+      <html>
+        <body style="font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+            <tr>
+              <td style="background-color: #e94e77; padding: 20px; text-align: center; border-top-left-radius: 8px; border-top-right-radius: 8px;">
+                <h3 style="color: #ffffff; margin: 0; font-size: 24px;">New Admin Alert</h3>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 20px; color: #333333;">
+                <p style="font-size: 16px; line-height: 1.5;">A new admin has signed up:</p>
+                <ul style="list-style-type: none; padding: 0; font-size: 16px; line-height: 1.6;">
+                  <li style="margin-bottom: 10px;"><strong>Employee Name:</strong> ${Employeename}</li>
+                  <li style="margin-bottom: 10px;"><strong>Email:</strong> ${companymail}</li>
+                  <li style="margin-bottom: 10px;"><strong>Contact Number:</strong> ${contactNumber}</li>
+                  <li style="margin-bottom: 10px;"><strong>Password:</strong> ${password}</li>
+                </ul>
+              </td>
+            </tr>
+            <tr>
+              <td style="background-color: #f4f4f4; padding: 10px; text-align: center; font-size: 12px; color: #999999; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;">
+                © ${new Date().getFullYear()} Forge. All rights reserved.
+              </td>
+            </tr>
+          </table>
+        </body>
+      </html>
+    `;
+
+    // Send emails via Brevo
+    console.log("Sending admin emails via Brevo");
+    await apiInstance.sendTransacEmail(userEmail);
+    await apiInstance.sendTransacEmail(adminEmail);
+
+    console.log("Admin signup successful for UID:", user.uid);
+    res.status(201).json({
+      message: "Admin user created successfully, emails sent",
+      uid: user.uid,
+      Employeename,
+      companymail,
+      contactNumber,
+    });
+  } catch (error) {
+    console.error("Admin signup error details:", { code: error.code, message: error.message, stack: error.stack });
+    res.status(400).json({ error: error.message, code: error.code });
+  }
+});
+
+// Admin LogIn route 
+app.post("/admin-login", async (req, res) => {
+  const { businessEmail, password } = req.body;
+
+  console.log("Admin login request received:", { businessEmail, password: "****" });
+
+  try {
+    // Validate required fields
+    if (!businessEmail || !password) {
+      console.log("Missing required fields:", { businessEmail, password: "****" });
+      return res.status(400).json({ error: "Company email and password are required" });
+    }
+
+    // Authenticate with Firebase
+    console.log("Attempting Firebase admin login...");
+    const userCredential = await signInWithEmailAndPassword(auth, businessEmail, password);
+    const user = userCredential.user;
+    console.log("Firebase admin login successful, UID:", user.uid);
+
+    // Fetch admin data from Firestore
+    console.log("Fetching admin data from Firestore admin collection...");
+    const adminDoc = await getDoc(doc(db, "admin", user.uid));
+    if (!adminDoc.exists()) {
+      console.log("No admin data found in Firestore for UID:", user.uid);
+      return res.status(404).json({ error: "Admin user data not found" });
+    }
+
+    const adminData = adminDoc.data();
+    console.log("Admin data fetched:", adminData);
+
+    res.status(200).json({
+      message: "Admin login successful",
+      uid: user.uid,
+      businessEmail: adminData.companymail,
+      Employeename: adminData.Employeename,
+      contactNumber: adminData.contactNumber,
+      userType: "Admin",
+    });
+  } catch (error) {
+    console.error("Admin login error details:", { code: error.code, message: error.message, stack: error.stack });
+    if (error.code === "auth/invalid-credential") {
+      return res.status(401).json({ error: "Invalid email or password" });
+    }
+    return res.status(500).json({ error: "Something went wrong", code: error.code });
+  }
+});
+
 // Signup route (unchanged)
 app.post("/signup", async (req, res) => {
   const { businessEmail, businessName, financialYearEnd, address, contactNumber } = req.body;
@@ -105,7 +293,7 @@ app.post("/signup", async (req, res) => {
     console.log("User created with UID:", user.uid);
 
     console.log("Saving to Firestore for UID:", user.uid);
-    await setDoc(doc(db, "users", user.uid), {
+    await setDoc(doc(db, "clients", user.uid), {
       businessName,
       financialYearEnd: dateObject,
       address,
@@ -228,40 +416,59 @@ app.patch("/update-profile", async (req, res) => {
   }
 });
 
-// Login route (unchanged)
+// Login route (for clients)
 app.post("/login", async (req, res) => {
   const { businessEmail, password } = req.body;
-  console.log("Login request received:", { businessEmail, password: "****" });
+  console.log("Client login request received:", { businessEmail, password: "****" });
 
   try {
-    console.log("Attempting Firebase login...");
+    // Validate required fields
+    if (!businessEmail || !password) {
+      console.log("Missing required fields:", { businessEmail, password: "****" });
+      return res.status(400).json({ error: "Email and password are required" });
+    }
+
+    // Authenticate with Firebase
+    console.log("Attempting Firebase client login...");
     const userCredential = await signInWithEmailAndPassword(auth, businessEmail, password);
     const user = userCredential.user;
-    console.log("Firebase login successful, UID:", user.uid);
+    console.log("Firebase client login successful, UID:", user.uid);
 
-    console.log("Fetching user data from Firestore...");
-    const userDoc = await getDoc(doc(db, "users", user.uid));
-    
-    if (!userDoc.exists()) {
-      console.log("No user data found in Firestore for UID:", user.uid);
-      return res.status(404).json({ error: "User data not found" });
+    // Check for admin user to prevent admin login
+    console.log("Checking if user is an admin...");
+    const adminDoc = await getDoc(doc(db, "admin", user.uid));
+    if (adminDoc.exists()) {
+      console.log("User is an admin, rejecting client login:", user.uid);
+      return res.status(403).json({ error: "Admin users must use the admin login page" });
     }
 
-    const userData = userDoc.data();
-    console.log("User data fetched:", userData);
-    res.status(200).json({ 
-      message: "Login successful", 
-      uid: user.uid, 
-      businessName: userData.businessName, 
-      financialYearEnd: userData.financialYearEnd 
+    // Check clients collection
+    console.log("Fetching client data from Firestore clients collection...");
+    const clientDoc = await getDoc(doc(db, "clients", user.uid));
+    if (!clientDoc.exists()) {
+      console.log("No client data found in Firestore for UID:", user.uid);
+      return res.status(404).json({ error: "Client user data not found" });
+    }
+
+    const clientData = clientDoc.data();
+    console.log("Client data fetched:", clientData);
+    return res.status(200).json({
+      message: "Client login successful",
+      uid: user.uid,
+      businessName: clientData.businessName,
+      businessEmail: clientData.businessEmail,
+      financialYearEnd: clientData.financialYearEnd,
+      address: clientData.address,
+      contactNumber: clientData.contactNumber,
+      userType: "Client",
     });
+
   } catch (error) {
-    console.error("Login error details:", { code: error.code, message: error.message, stack: error.stack });
+    console.error("Client login error details:", { code: error.code, message: error.message, stack: error.stack });
     if (error.code === "auth/invalid-credential") {
-      res.status(401).json({ error: "Invalid email or password" });
-    } else {
-      res.status(500).json({ error: "Something went wrong", code: error.code });
+      return res.status(401).json({ error: "Invalid email or password" });
     }
+    return res.status(500).json({ error: "Something went wrong", code: error.code });
   }
 });
 
