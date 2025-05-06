@@ -11,7 +11,7 @@ export default function ProtectedRoute() {
         console.log("ProtectedRoute: Checking token:", token ? "present" : "missing");
 
         if (!token) {
-          console.log("ProtectedRoute: No token, redirecting to /Login");
+          console.log("ProtectedRoute: No token, redirecting to /AdminLogIn");
           setIsAdmin(false);
           return;
         }
@@ -27,7 +27,7 @@ export default function ProtectedRoute() {
         const data = await response.json();
 
         if (!response.ok) {
-          console.log("ProtectedRoute: Verify-admin failed:", data.error);
+          console.log("ProtectedRoute: Verify-admin failed:", data.error || `HTTP ${response.status}`);
           setIsAdmin(false);
           return;
         }
@@ -35,7 +35,7 @@ export default function ProtectedRoute() {
         console.log("ProtectedRoute: Admin status:", data.isAdmin);
         setIsAdmin(data.isAdmin);
       } catch (error) {
-        console.error("ProtectedRoute: Error checking admin status:", error);
+        console.error("ProtectedRoute: Error checking admin status:", error.message);
         setIsAdmin(false);
       }
     };

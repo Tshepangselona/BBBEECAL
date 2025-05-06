@@ -241,44 +241,46 @@ app.post("/admin-signup", async (req, res) => {
   }
 });
 
-// Admin LogIn route 
+// Admin login route
 app.post("/admin-login", async (req, res) => {
   const { businessEmail, password } = req.body;
-
   console.log("Admin login request received:", { businessEmail, password: "****" });
 
   try {
-    // Validate required fields
     if (!businessEmail || !password) {
       console.log("Missing required fields:", { businessEmail, password: "****" });
-      return res.status(400).json({ error: "Company email and password are required" });
+      return res.status(400).json({ error: "Email and password are required" });
     }
 
-    // Authenticate with Firebase
     console.log("Attempting Firebase admin login...");
     const userCredential = await signInWithEmailAndPassword(auth, businessEmail, password);
     const user = userCredential.user;
     console.log("Firebase admin login successful, UID:", user.uid);
 
-    // Fetch admin data from Firestore
     console.log("Fetching admin data from Firestore admin collection...");
     const adminDoc = await getDoc(doc(db, "admin", user.uid));
     if (!adminDoc.exists()) {
       console.log("No admin data found in Firestore for UID:", user.uid);
-      return res.status(404).json({ error: "Admin user data not found" });
+      return res.status(403).json({ error: "Admin user data not found" });
     }
 
     const adminData = adminDoc.data();
     console.log("Admin data fetched:", adminData);
 
-    res.status(200).json({
+    // Generate JWT
+    const token = jwt.sign({ uid: user.uid, isAdmin: true }, JWT_SECRET, { expiresIn: "1h" });
+    console.log("JWT generated for admin:", user.uid);
+
+    return res.status(200).json({
       message: "Admin login successful",
+      token,
       uid: user.uid,
+      businessName: adminData.Employeename,
       businessEmail: adminData.companymail,
-      Employeename: adminData.Employeename,
       contactNumber: adminData.contactNumber,
       userType: "Admin",
     });
+
   } catch (error) {
     console.error("Admin login error details:", { code: error.code, message: error.message, stack: error.stack });
     if (error.code === "auth/invalid-credential") {
@@ -287,7 +289,6 @@ app.post("/admin-login", async (req, res) => {
     return res.status(500).json({ error: "Something went wrong", code: error.code });
   }
 });
-
 // Check admin status
 app.get("/check-admin", async (req, res) => {
   const authHeader = req.headers.authorization;

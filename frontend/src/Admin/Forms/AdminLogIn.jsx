@@ -31,6 +31,10 @@ export default function AdminLogIn() {
 
       if (!res.ok) throw new Error(data.error || "Something went wrong");
 
+      // Store JWT in localStorage
+      localStorage.setItem("authToken", data.token);
+      console.log("Stored authToken in localStorage");
+
       setSuccess(data.message);
       navigate("/AdminDashboard", {
         state: {
