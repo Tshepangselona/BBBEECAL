@@ -56,7 +56,6 @@ const Home = () => {
   const [socioEconomicDevelopmentDetails, setSocioEconomicDevelopmentDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [assessmentStarted, setAssessmentStarted] = useState(false); // New state to track assessment status
 
   // Format Firestore Timestamp to DD/MMM/YYYY
   const formatDate = (timestamp) => {
@@ -81,72 +80,84 @@ const Home = () => {
     }
   };
 
-  // Placeholder for fetching user profile (commented out since focusing on frontend)
-  /*
-  const fetchUserProfile = async (uid) => {
+// Add this function inside Home component
+const fetchUserProfile = async (uid) => {
+  try {
+    const response = await fetch(`http://localhost:5000/get-profile?uid=${uid}`);
+    if (!response.ok) throw new Error(`Failed to fetch profile: ${response.statusText}`);
+    const data = await response.json();
+    setFinancialData((prevData) => ({
+      ...prevData,
+      companyName: data.businessName || prevData.companyName,
+      yearEnd: data.financialYearEnd ? formatDate(data.financialYearEnd) : prevData.yearEnd,
+      sector: data.sector || prevData.sector,
+    }));
+    setOriginalData({
+      companyName: data.businessName || financialData.companyName,
+      sector: data.sector || financialData.sector,
+    });
+  } catch (err) {
+    console.error("Fetch profile error:", err);
+    setError("Failed to fetch profile data from server");
+  }
+};
+
+// Update useEffect
+useEffect(() => {
+  const userData = location.state?.userData;
+  console.log("Raw userData:", userData);
+
+  if (!userData || !userData.uid) {
+    console.log("No user data or UID found, redirecting to Login");
+    setError("User data not provided. Please log in.");
+    setLoading(false);
+    navigate("/Login", { replace: true });
+    return;
+  }
+
+  const initializeData = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/get-profile?uid=${uid}`);
-      if (!response.ok) throw new Error(`Failed to fetch profile: ${response.statusText}`);
-      const data = await response.json();
+      setUserId(userData.uid);
+      const formattedYearEnd = userData.financialYearEnd
+        ? formatDate(userData.financialYearEnd)
+        : "";
+      const initialData = {
+        companyName: userData.businessName || '',
+        yearEnd: formattedYearEnd || '',
+        sector: userData.sector || '',
+      };
       setFinancialData((prevData) => ({
         ...prevData,
-        companyName: data.businessName || prevData.companyName,
-        yearEnd: data.financialYearEnd ? formatDate(data.financialYearEnd) : prevData.yearEnd,
-        sector: data.sector || prevData.sector,
+        ...initialData,
+        turnover: prevData.turnover,
+        npbt: prevData.npbt,
+        npat: prevData.npat,
+        salaries: prevData.salaries,
+        wages: prevData.wages,
+        directorsEmoluments: prevData.directorsEmoluments,
+        annualPayroll: prevData.annualPayroll,
+        expenses: prevData.expenses,
+        costOfSales: prevData.costOfSales,
+        depreciation: prevData.depreciation,
+        sdlPayments: prevData.sdlPayments,
+        totalLeviableAmount: prevData.totalLeviableAmount,
+        totalMeasuredProcurementSpend: prevData.totalMeasuredProcurementSpend,
       }));
-      setOriginalData({
-        companyName: data.businessName || financialData.companyName,
-        sector: data.sector || financialData.sector,
-      });
+      setOriginalData({ companyName: initialData.companyName, sector: initialData.sector });
+
+      // Fetch additional profile data
+      await fetchUserProfile(userData.uid);
     } catch (err) {
-      console.error("Fetch profile error:", err);
-      setError("Failed to fetch profile data from server");
+      console.error("Error processing data:", err);
+      setError("Failed to load company data");
+    } finally {
+      setLoading(false);
     }
   };
-  */
 
-  // Initialize user data
-  useEffect(() => {
-    const userData = location.state?.userData;
-    console.log("Raw userData:", userData);
+  initializeData();
+}, [location, navigate]);
 
-    if (!userData || !userData.uid) {
-      console.log("No user data or UID found, redirecting to Login");
-      setError("User data not provided. Please log in.");
-      setLoading(false);
-      navigate("/Login", { replace: true });
-      return;
-    }
-
-    const initializeData = async () => {
-      try {
-        setUserId(userData.uid);
-        const formattedYearEnd = userData.financialYearEnd
-          ? formatDate(userData.financialYearEnd)
-          : "";
-        const initialData = {
-          companyName: userData.businessName || '',
-          yearEnd: formattedYearEnd || '',
-          sector: userData.sector || '',
-        };
-        setFinancialData((prevData) => ({
-          ...prevData,
-          ...initialData,
-        }));
-        setOriginalData({ companyName: initialData.companyName, sector: initialData.sector });
-
-        // Fetch profile data (commented out for frontend-only)
-        // await fetchUserProfile(userData.uid);
-      } catch (err) {
-        console.error("Error processing data:", err);
-        setError("Failed to load company data");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initializeData();
-  }, [location, navigate]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -163,8 +174,6 @@ const Home = () => {
     });
   };
 
-  // Placeholder for saving profile changes (commented out)
-  /*
   const handleSave = async () => {
     try {
       const res = await fetch("http://localhost:5000/update-profile", {
@@ -188,102 +197,6 @@ const Home = () => {
       console.error("Error saving profile:", err);
       setError("Failed to save changes");
     }
-  };
-  */
-
-  // Start New Assessment
-  const startNewAssessment = () => {
-    setFinancialData({
-      companyName: originalData.companyName || '',
-      yearEnd: '',
-      sector: originalData.sector || '',
-      turnover: 0,
-      npbt: 0,
-      npat: 0,
-      salaries: 0,
-      wages: 0,
-      directorsEmoluments: 0,
-      annualPayroll: 0,
-      expenses: 0,
-      costOfSales: 0,
-      depreciation: 0,
-      sdlPayments: 0,
-      totalLeviableAmount: 0,
-      totalMeasuredProcurementSpend: 0,
-    });
-    setOwnershipDetails(null);
-    setManagementDetails(null);
-    setEmploymentDetails(null);
-    setYesDetails(null);
-    setSkillsDevelopmentDetails(null);
-    setSupplierDevelopmentDetails(null);
-    setEnterpriseDevelopmentDetails(null);
-    setSocioEconomicDevelopmentDetails(null);
-    setResults(null);
-    setIsDirty(false);
-    setAssessmentStarted(true);
-    console.log('Started new assessment');
-  };
-
-  // Load Saved Assessment (placeholder for frontend-only)
-  const loadSavedAssessment = () => {
-    // Simulate loading data (replace with backend fetch later)
-    setFinancialData((prevData) => ({
-      ...prevData,
-      turnover: 1000000, // Example data
-      npbt: 200000,
-      npat: 150000,
-      sdlPayments: 50000,
-      totalLeviableAmount: 1000000,
-      totalMeasuredProcurementSpend: 800000,
-    }));
-    setOwnershipDetails({ ownershipData: { blackOwnershipPercentage: 25 } });
-    setManagementDetails({ managementData: { blackVotingRights: 30, blackEconomicInterest: 20 } });
-    setSkillsDevelopmentDetails({ summary: { totalDirectExpenditure: 60000, totalTrainings: 10 } });
-    setAssessmentStarted(true);
-    console.log('Loaded saved assessment (simulated)');
-    
-    // Backend fetch (uncomment when backend is ready)
-    /*
-    const fetchAssessment = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch(`http://localhost:5000/get-assessment?uid=${userId}`);
-        if (!response.ok) {
-          if (response.status === 404) {
-            setError('No saved assessment found');
-            return;
-          }
-          throw new Error(`Failed to load assessment: ${response.statusText}`);
-        }
-        const data = await response.json();
-        setFinancialData((prevData) => ({
-          ...prevData,
-          ...data.financialData,
-          companyName: data.financialData?.companyName || originalData.companyName,
-          sector: data.financialData?.sector || originalData.sector,
-          yearEnd: data.financialData?.yearEnd || prevData.yearEnd,
-        }));
-        setOwnershipDetails(data.ownershipDetails || null);
-        setManagementDetails(data.managementDetails || null);
-        setEmploymentDetails(data.employmentDetails || null);
-        setYesDetails(data.yesDetails || null);
-        setSkillsDevelopmentDetails(data.skillsDevelopmentDetails || null);
-        setSupplierDevelopmentDetails(data.supplierDevelopmentDetails || null);
-        setEnterpriseDevelopmentDetails(data.enterpriseDevelopmentDetails || null);
-        setSocioEconomicDevelopmentDetails(data.socioEconomicDevelopmentDetails || null);
-        setIsDirty(false);
-        setAssessmentStarted(true);
-        console.log('Loaded saved assessment:', data);
-      } catch (err) {
-        console.error('Error loading assessment:', err);
-        setError(err.message || 'Failed to load saved assessment');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchAssessment();
-    */
   };
 
   const handleOwnershipSubmit = (data) => {
@@ -521,16 +434,10 @@ const Home = () => {
           Complete your company information to calculate your B-BBEE score
         </p>
         <div className="flex gap-4">
-          <button
-            onClick={startNewAssessment}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-          >
+          <button className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
             Start New Assessment
           </button>
-          <button
-            onClick={loadSavedAssessment}
-            className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300"
-          >
+          <button className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300">
             Load Saved Assessment
           </button>
         </div>
@@ -581,7 +488,7 @@ const Home = () => {
         {isDirty && (
           <div className="mt-4 flex justify-end">
             <button
-              onClick={() => console.log('Save Changes clicked')} // Placeholder
+              onClick={handleSave}
               className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
             >
               Save Changes
@@ -590,240 +497,225 @@ const Home = () => {
         )}
       </div>
 
-      {/* Remaining Sections (shown only after assessment is started or loaded) */}
-      {assessmentStarted && (
-        <>
-          {/* Financial Information */}
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">Financial Information</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[
-                { name: "turnover", label: "Turnover / Revenue (R)", placeholder: "Enter turnover" },
-                { name: "npbt", label: "Net Profit Before Tax (R)", placeholder: "Enter NPBT" },
-                { name: "npat", label: "Net Profit After Tax (R)", placeholder: "Enter NPAT" },
-                { name: "salaries", label: "Salaries (R)", placeholder: "Enter salaries" },
-                { name: "wages", label: "Wages (R)", placeholder: "Enter wages" },
-                { name: "directorsEmoluments", label: "Directors Emoluments (R)", placeholder: "Enter directors emoluments" },
-                { name: "annualPayroll", label: "Annual Payroll (R)", placeholder: "Enter annual payroll" },
-                { name: "expenses", label: "Expenses (R)", placeholder: "Enter expenses" },
-                { name: "costOfSales", label: "Cost of Sales (R)", placeholder: "Enter cost of sales" },
-                { name: "depreciation", label: "Depreciation (R)", placeholder: "Enter depreciation" },
-              ].map((field) => (
-                <div key={field.name}>
-                  <label className="block text-sm font-medium mb-1">{field.label}</label>
-                  <input
-                    type="number"
-                    name={field.name}
-                    value={financialData[field.name]}
-                    onChange={handleInputChange}
-                    className="w-full p-2 border rounded"
-                    placeholder={field.placeholder}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Skills Development */}
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">Skills Development</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Total SDL Payments (R)</label>
-                <input
-                  type="number"
-                  name="sdlPayments"
-                  value={financialData.sdlPayments}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border rounded"
-                  placeholder="Enter SDL payments"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Total Leviable Amount (R)</label>
-                <input
-                  type="number"
-                  name="totalLeviableAmount"
-                  value={financialData.totalLeviableAmount}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border rounded"
-                  placeholder="Enter total leviable amount"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Procurement */}
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">Procurement</h2>
-            <div>
-              <label className="block text-sm font-medium mb-1">Total Measured Procurement Spend (R)</label>
+      {/* Financial Information */}
+      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 className="text-xl font-semibold mb-4">Financial Information</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[
+            { name: "turnover", label: "Turnover / Revenue (R)", placeholder: "Enter turnover" },
+            { name: "npbt", label: "Net Profit Before Tax (R)", placeholder: "Enter NPBT" },
+            { name: "npat", label: "Net Profit After Tax (R)", placeholder: "Enter NPAT" },
+            { name: "salaries", label: "Salaries (R)", placeholder: "Enter salaries" },
+            { name: "wages", label: "Wages (R)", placeholder: "Enter wages" },
+            { name: "directorsEmoluments", label: "Directors Emoluments (R)", placeholder: "Enter directors emoluments" },
+            { name: "annualPayroll", label: "Annual Payroll (R)", placeholder: "Enter annual payroll" },
+            { name: "expenses", label: "Expenses (R)", placeholder: "Enter expenses" },
+            { name: "costOfSales", label: "Cost of Sales (R)", placeholder: "Enter cost of sales" },
+            { name: "depreciation", label: "Depreciation (R)", placeholder: "Enter depreciation" },
+          ].map((field) => (
+            <div key={field.name}>
+              <label className="block text-sm font-medium mb-1">{field.label}</label>
               <input
                 type="number"
-                name="totalMeasuredProcurementSpend"
-                value={financialData.totalMeasuredProcurementSpend}
+                name={field.name}
+                value={financialData[field.name]}
                 onChange={handleInputChange}
                 className="w-full p-2 border rounded"
-                placeholder="Enter total procurement spend"
+                placeholder={field.placeholder}
               />
             </div>
-          </div>
+          ))}
+        </div>
+      </div>
 
-          {/* Ownership Assessment */}
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">Ownership Assessment</h2>
-            <div className="flex justify-between items-center">
-              <p>
-                {ownershipDetails?.ownershipData
-                  ? `Ownership details added (Black Ownership: ${ownershipDetails.ownershipData.blackOwnershipPercentage}%)`
-                  : "Add ownership details to calculate your B-BBEE ownership score"}
-              </p>
-              <button
-                onClick={() => setShowOwnershipModal(true)}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-              >
-                {ownershipDetails ? "Edit Ownership Details" : "Add Ownership Details"}
-              </button>
-            </div>
+      {/* Skills Development */}
+      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 className="text-xl font-semibold mb-4">Skills Development</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Total SDL Payments (R)</label>
+            <input
+              type="number"
+              name="sdlPayments"
+              value={financialData.sdlPayments}
+              onChange={handleInputChange}
+              className="w-full p-2 border rounded"
+              placeholder="Enter SDL payments"
+            />
           </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Total Leviable Amount (R)</label>
+            <input
+              type="number"
+              name="totalLeviableAmount"
+              value={financialData.totalLeviableAmount}
+              onChange={handleInputChange}
+              className="w-full p-2 border rounded"
+              placeholder="Enter total leviable amount"
+            />
+          </div>
+        </div>
+      </div>
 
-          {/* Management Control */}
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">Management Control</h2>
-            <div className="flex justify-between items-center">
-              <p>
-                {managementDetails?.managementData
-                  ? `Management details added (Black Voting Rights: ${managementDetails.managementData.blackVotingRights}%)`
-                  : "Add management details to calculate your B-BBEE management score"}
-              </p>
-              <button
-                onClick={() => setShowManagementModal(true)}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-              >
-                {managementDetails ? "Edit Management Details" : "Add Management Details"}
-              </button>
-            </div>
-          </div>
+      {/* Procurement */}
+      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 className="text-xl font-semibold mb-4">Procurement</h2>
+        <div>
+          <label className="block text-sm font-medium mb-1">Total Measured Procurement Spend (R)</label>
+          <input
+            type="number"
+            name="totalMeasuredProcurementSpend"
+            value={financialData.totalMeasuredProcurementSpend}
+            onChange={handleInputChange}
+            className="w-full p-2 border rounded"
+            placeholder="Enter total procurement spend"
+          />
+        </div>
+      </div>
 
-          {/* Employment Equity */}
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">Employment Equity</h2>
-            <div className="flex justify-between items-center">
-              <p>
-                {employmentDetails?.employmentData
-                  ? `Employment details added (Total Employees: ${employmentDetails.employmentData.totalEmployees})`
-                  : "Add employment details to calculate your B-BBEE employment equity score"}
-              </p>
-              <button
-                onClick={() => setShowEmploymentModal(true)}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-              >
-                {employmentDetails ? "Edit Employment Details" : "Add Employment Details"}
-              </button>
-            </div>
-          </div>
+      {/* Ownership Assessment */}
+      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 className="text-xl font-semibold mb-4">Ownership Assessment</h2>
+        <div className="flex justify-between items-center">
+          <p>
+            {ownershipDetails?.ownershipData
+              ? `Ownership details added (Black Ownership: ${ownershipDetails.ownershipData.blackOwnershipPercentage}%)`
+              : "Add ownership details to calculate your B-BBEE ownership score"}
+          </p>
+          <button
+            onClick={() => setShowOwnershipModal(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+          >
+            {ownershipDetails ? "Edit Ownership Details" : "Add Ownership Details"}
+          </button>
+        </div>
+      </div>
 
-          {/* Yes 4 Youth Initiative */}
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">Yes 4 Youth Initiative</h2>
-            <div className="flex justify-between items-center">
-              <p>
-                {yesDetails?.yesData
-                  ? `YES details added (Total Participants: ${yesDetails.yesData.totalParticipants})`
-                  : "Add YES initiative details to calculate your B-BBEE YES contribution"}
-              </p>
-              <button
-                onClick={() => setShowYesModal(true)}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-              >
-                {yesDetails ? "Edit YES Details" : "Add YES Details"}
-              </button>
-            </div>
-          </div>
+      {/* Management Control */}
+      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 className="text-xl font-semibold mb-4">Management Control</h2>
+        <div className="flex justify-between items-center">
+          <p>
+            {managementDetails?.managementData
+              ? `Management details added (Black Voting Rights: ${managementDetails.managementData.blackVotingRights}%)`
+              : "Add management details to calculate your B-BBEE management score"}
+          </p>
+          <button
+            onClick={() => setShowManagementModal(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+          >
+            {managementDetails ? "Edit Management Details" : "Add Management Details"}
+          </button>
+        </div>
+      </div>
 
-          {/* Skills Development Details */}
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">Skills Development Details</h2>
-            <div className="flex justify-between items-center">
-              <p>
-                {skillsDevelopmentDetails?.summary
-                  ? `Skills development details added (Total Trainings: ${skillsDevelopmentDetails.summary.totalTrainings})`
-                  : "Add skills development details to calculate your B-BBEE skills development score"}
-              </p>
-              <button
-                onClick={() => setShowSkillsDevelopmentModal(true)}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-              >
-                {skillsDevelopmentDetails ? "Edit Skills Development Details" : "Add Skills Development Details"}
-              </button>
-            </div>
-          </div>
+      {/* Employment Equity */}
+      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 className="text-xl font-semibold mb-4">Employment Equity</h2>
+        <div className="flex justify-between items-center">
+          <p>
+            {employmentDetails?.employmentData
+              ? `Employment details added (Total Employees: ${employmentDetails.employmentData.totalEmployees})`
+              : "Add employment details to calculate your B-BBEE employment equity score"}
+          </p>
+          <button
+            onClick={() => setShowEmploymentModal(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+          >
+            {employmentDetails ? "Edit Employment Details" : "Add Employment Details"}
+          </button>
+        </div>
+      </div>
 
-          {/* Supplier Development & Imports */}
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">Supplier Development & Imports</h2>
-            <div className="flex justify-between items-center">
-              <p>
-                {supplierDevelopmentDetails?.localSummary
-                  ? `Supplier development details added (Total Suppliers: ${supplierDevelopmentDetails.localSummary.totalSuppliers}, Total Imports: ${supplierDevelopmentDetails.importSummary.totalImports})`
-                  : "Add supplier development and imports details to calculate your B-BBEE supplier development score"}
-              </p>
-              <button
-                onClick={() => setShowSupplierDevelopmentModal(true)}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-              >
-                {supplierDevelopmentDetails ? "Edit Supplier Development & Imports" : "Add Supplier Development & Imports"}
-              </button>
-            </div>
-          </div>
+      {/* Yes 4 Youth Initiative */}
+      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 className="text-xl font-semibold mb-4">Yes 4 Youth Initiative</h2>
+        <div className="flex justify-between items-center">
+          <p>
+            {yesDetails?.yesData
+              ? `YES details added (Total Participants: ${yesDetails.yesData.totalParticipants})`
+              : "Add YES initiative details to calculate your B-BBEE YES contribution"}
+          </p>
+          <button
+            onClick={() => setShowYesModal(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+          >
+            {yesDetails ? "Edit YES Details" : "Add YES Details"}
+          </button>
+        </div>
+      </div>
 
-          {/* Enterprise Development */}
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">Enterprise Development</h2>
-            <div className="flex justify-between items-center">
-              <p>
-                {enterpriseDevelopmentDetails?.summary
-                  ? `Enterprise development details added (Total Beneficiaries: ${enterpriseDevelopmentDetails.summary.totalBeneficiaries})`
-                  : "Add enterprise development details to calculate your B-BBEE enterprise development score"}
-              </p>
-              <button
-                onClick={() => setShowEnterpriseDevelopmentModal(true)}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-              >
-                {enterpriseDevelopmentDetails ? "Edit Enterprise Development Details" : "Add Enterprise Development Details"}
-              </button>
-            </div>
-          </div>
+      {/* Skills Development Details */}
+      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 className="text-xl font-semibold mb-4">Skills Development Details</h2>
+        <div className="flex justify-between items-center">
+          <p>
+            {skillsDevelopmentDetails?.summary
+              ? `Skills development details added (Total Trainings: ${skillsDevelopmentDetails.summary.totalTrainings})`
+              : "Add skills development details to calculate your B-BBEE skills development score"}
+          </p>
+          <button
+            onClick={() => setShowSkillsDevelopmentModal(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+          >
+            {skillsDevelopmentDetails ? "Edit Skills Development Details" : "Add Skills Development Details"}
+          </button>
+        </div>
+      </div>
 
-          {/* Socio-Economic Development */}
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">Socio-Economic Development</h2>
-            <div className="flex justify-between items-center">
-              <p>
-                {socioEconomicDevelopmentDetails?.summary
-                  ? `Socio-economic development details added (Total Beneficiaries: ${socioEconomicDevelopmentDetails.summary.totalBeneficiaries})`
-                  : "Add socio-economic development details to calculate your B-BBEE SED score"}
-              </p>
-              <button
-                onClick={() => setShowSocioEconomicDevelopmentModal(true)}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-              >
-                {socioEconomicDevelopmentDetails ? "Edit SED Details" : "Add SED Details"}
-              </button>
-            </div>
-          </div>
+      {/* Supplier Development & Imports */}
+      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 className="text-xl font-semibold mb-4">Supplier Development & Imports</h2>
+        <div className="flex justify-between items-center">
+          <p>
+            {supplierDevelopmentDetails?.localSummary
+              ? `Supplier development details added (Total Suppliers: ${supplierDevelopmentDetails.localSummary.totalSuppliers}, Total Imports: ${supplierDevelopmentDetails.importSummary.totalImports})`
+              : "Add supplier development and imports details to calculate your B-BBEE supplier development score"}
+          </p>
+          <button
+            onClick={() => setShowSupplierDevelopmentModal(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+          >
+            {supplierDevelopmentDetails ? "Edit Supplier Development & Imports" : "Add Supplier Development & Imports"}
+          </button>
+        </div>
+      </div>
 
-          {/* Submit Button */}
-          <div className="flex justify-center mt-6">
-            <button
-              onClick={calculateBBBEEScore}
-              className="bg-green-600 text-white px-8 py-3 rounded-md hover:bg-green-700 font-bold text-lg"
-            >
-              Calculate B-BBEE Score
-            </button>
-          </div>
-        </>
-      )}
+      {/* Enterprise Development */}
+      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 className="text-xl font-semibold mb-4">Enterprise Development</h2>
+        <div className="flex justify-between items-center">
+          <p>
+            {enterpriseDevelopmentDetails?.summary
+              ? `Enterprise development details added (Total Beneficiaries: ${enterpriseDevelopmentDetails.summary.totalBeneficiaries})`
+              : "Add enterprise development details to calculate your B-BBEE enterprise development score"}
+          </p>
+          <button
+            onClick={() => setShowEnterpriseDevelopmentModal(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+          >
+            {enterpriseDevelopmentDetails ? "Edit Enterprise Development Details" : "Add Enterprise Development Details"}
+          </button>
+        </div>
+      </div>
+
+      {/* Socio-Economic Development */}
+      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 className="text-xl font-semibold mb-4">Socio-Economic Development</h2>
+        <div className="flex justify-between items-center">
+          <p>
+            {socioEconomicDevelopmentDetails?.summary
+              ? `Socio-economic development details added (Total Beneficiaries: ${socioEconomicDevelopmentDetails.summary.totalBeneficiaries})`
+              : "Add socio-economic development details to calculate your B-BBEE SED score"}
+          </p>
+          <button
+            onClick={() => setShowSocioEconomicDevelopmentModal(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+          >
+            {socioEconomicDevelopmentDetails ? "Edit SED Details" : "Add SED Details"}
+          </button>
+        </div>
+      </div>
 
       {/* Modals */}
       {showOwnershipModal && (
@@ -885,6 +777,16 @@ const Home = () => {
           results={results}
         />
       )}
+
+      {/* Submit Button */}
+      <div className="flex justify-center mt-6">
+        <button
+          onClick={calculateBBBEEScore}
+          className="bg-green-600 text-white px-8 py-3 rounded-md hover:bg-green-700 font-bold text-lg"
+        >
+          Calculate B-BBEE Score
+        </button>
+      </div>
     </div>
   );
 };
