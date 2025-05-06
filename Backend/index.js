@@ -1,17 +1,17 @@
 require('dotenv').config();
 const express = require("express");
 const cors = require("cors");
-const { auth, db } = require("./firebase"); // Client SDK for auth and other client-side operations
+const { auth, db } = require("./firebase");
 const { createUserWithEmailAndPassword, signInWithEmailAndPassword } = require("firebase/auth");
 const { doc, setDoc, getDoc, collection, addDoc, query, where, getDocs } = require("firebase/firestore");
 const SibApiV3Sdk = require('sib-api-v3-sdk');
 const crypto = require("crypto");
 const admin = require("firebase-admin");
+const jwt = require("jsonwebtoken");
 
-// Firebase Admin SDK configuration from .env
 const serviceAccount = {
   projectId: process.env.FIREBASE_PROJECT_ID,
-  privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"), 
+  privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
   clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
   clientId: process.env.FIREBASE_CLIENT_ID,
   authUri: process.env.FIREBASE_AUTH_URI,
@@ -21,12 +21,11 @@ const serviceAccount = {
   universeDomain: process.env.FIREBASE_UNIVERSE_DOMAIN,
 };
 
-// Initialize Firebase Admin SDK
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
 
-const adminDb = admin.firestore(); // Admin SDK Firestore instance
+const adminDb = admin.firestore();
 
 const app = express();
 app.use(cors());
@@ -39,13 +38,13 @@ app.use((req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
-// Configure Brevo API client
 const defaultClient = SibApiV3Sdk.ApiClient.instance;
 const apiKey = defaultClient.authentications['api-key'];
 apiKey.apiKey = process.env.BREVO_API_KEY;
 const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
 
-// Function to generate a random password
+const JWT_SECRET = process.env.JWT_SECRET || "your-jwt-secret"; // Store in .env
+
 const generatePassword = () => {
   return crypto.randomBytes(8).toString('hex');
 };
@@ -67,6 +66,39 @@ const validateDateFormat = (dateStr) => {
   
   return true;
 };
+
+// Verify admin status
+app.get("/verify-admin", async (req, res) => {
+  const authHeader = req.headers.authorization;
+  console.log("Verify admin request received, auth header:", authHeader ? "present" : "missing");
+
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    console.log("Verify admin: Missing or invalid authorization header");
+    return res.status(401).json({ error: "Authorization header missing or invalid" });
+  }
+
+  const token = authHeader.split("Bearer ")[1];
+
+  try {
+    console.log("Verifying JWT...");
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const uid = decoded.uid;
+    console.log("JWT verified, UID:", uid);
+
+    console.log("Checking admin collection for UID:", uid);
+    const adminDoc = await getDoc(doc(db, "admin", uid));
+    if (!adminDoc.exists()) {
+      console.log("User is not admin, UID:", uid);
+      return res.status(403).json({ isAdmin: false });
+    }
+
+    console.log("User is admin, UID:", uid);
+    return res.status(200).json({ isAdmin: true });
+  } catch (error) {
+    console.error("Verify admin error:", error.message);
+    return res.status(401).json({ error: "Invalid or expired token" });
+  }
+});
 
 // Admin Signup route 
 console.log("Registering /admin-signup endpoint");
@@ -253,6 +285,39 @@ app.post("/admin-login", async (req, res) => {
       return res.status(401).json({ error: "Invalid email or password" });
     }
     return res.status(500).json({ error: "Something went wrong", code: error.code });
+  }
+});
+
+// Check admin status
+app.get("/check-admin", async (req, res) => {
+  const authHeader = req.headers.authorization;
+  console.log("Check admin request received, auth header:", authHeader ? "present" : "missing");
+
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    console.log("Check admin: Missing or invalid authorization header");
+    return res.status(401).json({ error: "Authorization header missing or invalid" });
+  }
+
+  const idToken = authHeader.split("Bearer ")[1];
+
+  try {
+    console.log("Verifying ID token...");
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const uid = decodedToken.uid;
+    console.log("ID token verified, UID:", uid);
+
+    console.log("Checking admin collection for UID:", uid);
+    const adminDoc = await getDoc(doc(db, "admin", uid));
+    if (!adminDoc.exists()) {
+      console.log("User is not admin, UID:", uid);
+      return res.status(403).json({ isAdmin: false });
+    }
+
+    console.log("User is admin, UID:", uid);
+    return res.status(200).json({ isAdmin: true });
+  } catch (error) {
+    console.error("Check admin error:", { code: error.code, message: error.message });
+    return res.status(401).json({ error: "Invalid or expired token" });
   }
 });
 

@@ -1,8 +1,8 @@
 import {
   createBrowserRouter,
   createRoutesFromElements,
-  RouterProvider, Route,
-  Link
+  RouterProvider,
+  Route,
 } from "react-router-dom";
 import SignUp from "./Components/Forms/SignUp";
 import Login from "./Components/Forms/Login";
@@ -11,27 +11,30 @@ import AdminDashboard from "./Admin/Pages/AdminDashboard";
 import AdminLogIn from "./Admin/Forms/AdminLogIn";
 import AdminSignUp from "./Admin/Forms/AdminSignUp";
 import LandingPage from "./LandingPage";
+import ProtectedRoute from "../src/ProtectedRoute";
 
 const router = createBrowserRouter(
   createRoutesFromElements(
     <>
-    <Route index='/LandingPage' element={<LandingPage />} />
-    <Route path='/SignUp' element={<SignUp />} />
-    <Route path='/Login' element={<Login />} />
-    <Route path='/AdminDashboard' element={<AdminDashboard />} />
-    <Route path='/AdminLogIn' element={<AdminLogIn />} />
-    <Route path='/AdminSignUp' element={<AdminSignUp />} />
-    <Route path='/Home' element={<Home />} />
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/SignUp" element={<SignUp />} />
+      <Route path="/Login" element={<Login />} />
+      <Route element={<ProtectedRoute />}>
+        <Route path="/AdminDashboard" element={<AdminDashboard />} />
+      </Route>
+      <Route path="/AdminLogIn" element={<AdminLogIn />} />
+      <Route path="/AdminSignUp" element={<AdminSignUp />} />
+      <Route path="/Home" element={<Home />} />
     </>
   )
-)
+);
 
 const App = () => {
   return (
     <div>
       <RouterProvider router={router} />
     </div>
-  )
-}
+  );
+};
 
-export default App
+export default App;
