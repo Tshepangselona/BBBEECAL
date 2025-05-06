@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import logo from '../../assets/forge.png'
 
 export default function AdminLogIn() {
   const [formData, setFormData] = useState({ businessEmail: "", password: "" });
@@ -54,6 +55,9 @@ export default function AdminLogIn() {
 
   return (
     <div className="max-w-md mx-auto mt-10 p-6 bg-white rounded-lg shadow-md">
+      <div className="flex justify-center mb-6">
+        <img src={logo} alt="Forge Logo" className="h-16" />
+      </div>
       <h2 className="text-2xl font-bold mb-6 text-center">Admin Log In</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
         <input
