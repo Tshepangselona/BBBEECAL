@@ -1533,7 +1533,7 @@ app.delete('/skills-development/:userId', async (req, res) => {
   }
 });
 
-// Ownership Details - Create 
+// Ownership Details - Create
 app.post("/ownership-details", async (req, res) => {
   console.log("Ownership Details POST hit with body:", req.body);
   const { userId, participants, entities, ownershipData } = req.body;
@@ -1644,7 +1644,7 @@ app.post("/ownership-details", async (req, res) => {
   }
 });
 
-// Ownership Details - Retrieve (Updated to Admin SDK)
+// Ownership Details - Retrieve
 app.get("/ownership-details/:userId", async (req, res) => {
   console.log("Ownership Details GET hit with userId:", req.params.userId);
   const { userId } = req.params;
@@ -1677,7 +1677,7 @@ app.get("/ownership-details/:userId", async (req, res) => {
   }
 });
 
-// Ownership Details - Update (Updated to Admin SDK)
+// Ownership Details - Update
 app.put("/ownership-details/:id", async (req, res) => {
   console.log("Ownership Details PUT hit with body:", req.body);
   const { id } = req.params;
@@ -1701,7 +1701,7 @@ app.put("/ownership-details/:id", async (req, res) => {
       return res.status(400).json({ error: "Ownership data must be an object" });
     }
 
-    const userDoc = await adminDb.collection("users").doc(userId).get();
+    const userDoc = await adminDb.collection("clients").doc(userId).get();
     if (!userDoc.exists) {
       console.log("User not found for userId:", userId);
       return res.status(404).json({ error: "User not found" });
@@ -1805,7 +1805,7 @@ app.delete("/ownership-details/:userId", async (req, res) => {
     }
 
     // Check if user exists
-    const userDoc = await adminDb.collection("users").doc(userId).get();
+    const userDoc = await adminDb.collection("clients").doc(userId).get();
     if (!userDoc.exists) {
       console.log("User not found for userId:", userId);
       return res.status(404).json({ error: "User not found" });
