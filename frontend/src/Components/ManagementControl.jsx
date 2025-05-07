@@ -36,7 +36,6 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
         const response = await fetch(`http://localhost:5000/management-control/${userId}`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
         });
 
         if (response.ok) {
@@ -126,49 +125,78 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
     if (window.confirm('Are you sure you want to delete this manager?')) {
       setIsLoading(true);
       try {
+        // Optimistically update the UI
         const updatedManagers = managers.filter((_, i) => i !== index);
+        setManagers(updatedManagers);
         recalculateManagementData(updatedManagers);
 
-        const checkResponse = await fetch(`http://localhost:5000/management-control/${userId}`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-        });
+        // Ensure documentId is available
+        let currentDocumentId = documentId;
+        if (!currentDocumentId) {
+          const checkResponse = await fetch(`http://localhost:5000/management-control/${userId}`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+          });
 
-        if (checkResponse.ok) {
-          const { data } = await checkResponse.json();
-          if (data.length > 0) {
-            const existingId = data[0].id;
-            const response = await fetch(`http://localhost:5000/management-control/${existingId}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({ userId, managers: updatedManagers, managementData }),
-            });
-
-            if (!response.ok) {
-              const errorData = await response.json();
-              throw new Error(`Failed to update manager data: ${errorData.error}`);
-            }
+          if (!checkResponse.ok) {
+            throw new Error(`Failed to fetch document ID: HTTP ${checkResponse.status}`);
           }
+
+          const { data } = await checkResponse.json();
+          if (data.length === 0) {
+            throw new Error('No management control data found for this user');
+          }
+          currentDocumentId = data[0].id;
+          setDocumentId(currentDocumentId);
         }
 
-        setManagers(updatedManagers);
+        // Update backend
+        const response = await fetch(`http://localhost:5000/management-control/${currentDocumentId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, managers: updatedManagers, managementData }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(`Failed to update manager data: ${errorData.error || 'Unknown error'}`);
+        }
+
+        console.log('Manager deleted successfully');
       } catch (error) {
         console.error('Error deleting manager:', error);
         alert(`Failed to delete manager: ${error.message}`);
-        const response = await fetch(`http://localhost:5000/management-control/${userId}`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-        });
-        if (response.ok) {
-          const { data } = await response.json();
-          if (data.length > 0) {
-            setManagers(data[0].managers);
-            setManagementData(data[0].managementData);
-            setDocumentId(data[0].id);
+        // Re-fetch to restore state
+        try {
+          const response = await fetch(`http://localhost:5000/management-control/${userId}`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+          });
+          if (response.ok) {
+            const { data } = await response.json();
+            if (data.length > 0) {
+              setManagers(data[0].managers || []);
+              setManagementData(data[0].managementData || {
+                totalVotingRights: 0,
+                blackVotingRights: 0,
+                blackFemaleVotingRights: 0,
+                disabledVotingRights: 0,
+              });
+              setDocumentId(data[0].id);
+            } else {
+              setManagers([]);
+              setManagementData({
+                totalVotingRights: 0,
+                blackVotingRights: 0,
+                blackFemaleVotingRights: 0,
+                disabledVotingRights: 0,
+              });
+              setDocumentId(null);
+            }
           }
+        } catch (fetchError) {
+          console.error('Error re-fetching data:', fetchError);
+          alert('Failed to restore data. Please refresh the page.');
         }
       } finally {
         setIsLoading(false);
@@ -180,21 +208,13 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
     if (window.confirm('Are you sure you want to delete all management control data for this user?')) {
       setIsLoading(true);
       try {
-        console.log('Sending DELETE request for userId:', userId);
         const response = await fetch(`http://localhost:5000/management-control/${userId}`, {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
         });
 
-        console.log('DELETE response status:', response.status);
         if (!response.ok) {
-          let errorData;
-          try {
-            errorData = await response.json();
-          } catch {
-            errorData = { error: `Server error (HTTP ${response.status})` };
-          }
+          const errorData = await response.json();
           throw new Error(`Failed to delete management control data: ${errorData.error || 'Unknown error'}`);
         }
 
@@ -210,11 +230,11 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
       } catch (error) {
         console.error('Error deleting management control data:', error);
         alert(`Failed to delete: ${error.message}`);
+        // Re-fetch to restore state
         try {
           const response = await fetch(`http://localhost:5000/management-control/${userId}`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
           });
           if (response.ok) {
             const { data } = await response.json();
@@ -227,11 +247,20 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
                 disabledVotingRights: 0,
               });
               setDocumentId(data[0].id);
-              console.log('Restored documentId:', data[0].id);
+            } else {
+              setManagers([]);
+              setManagementData({
+                totalVotingRights: 0,
+                blackVotingRights: 0,
+                blackFemaleVotingRights: 0,
+                disabledVotingRights: 0,
+              });
+              setDocumentId(null);
             }
           }
         } catch (fetchError) {
           console.error('Error re-fetching data:', fetchError);
+          alert('Failed to restore data. Please refresh the page.');
         }
       } finally {
         setIsLoading(false);
@@ -297,7 +326,6 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
       const checkResponse = await fetch(`http://localhost:5000/management-control/${userId}`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
       });
 
       let method = 'POST';
@@ -317,7 +345,6 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ userId, managers, managementData }),
       });
 
@@ -482,7 +509,7 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
                 />
               </div>
               <div className="flex items-center">
-                <label className="text-sm font-medium mr-2">Independent Non-Executive</label>
+                <label className="block text-sm font-medium mr-2">Independent Non-Executive</label>
                 <input
                   type="checkbox"
                   name="isIndependentNonExecutive"
@@ -508,7 +535,7 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
               <h3 className="text-lg font-medium mb-2">Managers List</h3>
               <div className="overflow-x-auto">
                 <table className="min-w-full border-collapse border border-gray-300">
-                  <thead	cinTableHeader>
+                  <thead>
                     <tr className="bg-gray-200">
                       <th className="border border-gray-300 px-4 py-2">Name & Surname</th>
                       <th className="border border-gray-300 px-4 py-2">Site/Location</th>
@@ -619,7 +646,7 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
               type="button"
               onClick={deleteManagementControl}
               className="bg-red-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-red-700 w-full sm:w-auto transition-all duration-200 disabled:bg-red-300"
-              disabled={isLoading || !documentId}
+              disabled={isLoading}
             >
               Delete All Data
             </button>

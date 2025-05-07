@@ -45,6 +45,17 @@ const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-jwt-secret"; // Store in .env
 
+// Configure CORS
+const corsOptions = {
+  origin: 'http://localhost:3000', // Allow only the frontend origin
+  credentials: true, // Allow credentials (cookies, auth headers)
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Allowed methods
+  allowedHeaders: ['Content-Type', 'Authorization'], // Allowed headers
+};
+
+app.use(cors(corsOptions));
+app.use(express.json());
+
 const generatePassword = () => {
   return crypto.randomBytes(8).toString('hex');
 };
