@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 
 const ManagementControl = ({ userId, onClose, onSubmit }) => {
+  console.log('ManagementControl rendered with userId:', userId);
+
   const [managers, setManagers] = useState([]);
   const [newManager, setNewManager] = useState({
     name: '',
@@ -22,25 +24,47 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
     blackFemaleVotingRights: 0,
     disabledVotingRights: 0,
   });
+  const [documentId, setDocumentId] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Fetch existing data on mount
   useEffect(() => {
     const fetchData = async () => {
+      setIsLoading(true);
       try {
+        console.log('Fetching data for userId:', userId);
         const response = await fetch(`http://localhost:5000/management-control/${userId}`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
         });
 
         if (response.ok) {
           const { data } = await response.json();
+          console.log('Fetched management control data:', data);
           if (data.length > 0) {
-            setManagers(data[0].managers);
-            setManagementData(data[0].managementData);
+            setManagers(data[0].managers || []);
+            setManagementData(data[0].managementData || {
+              totalVotingRights: 0,
+              blackVotingRights: 0,
+              blackFemaleVotingRights: 0,
+              disabledVotingRights: 0,
+            });
+            setDocumentId(data[0].id);
+            console.log('Set documentId:', data[0].id);
+          } else {
+            console.log('No management control data found for userId:', userId);
+            setDocumentId(null);
           }
+        } else {
+          console.warn('GET request failed with status:', response.status);
+          alert(`Failed to fetch data: HTTP ${response.status}`);
         }
       } catch (error) {
         console.error('Error fetching management control data:', error);
+        alert('Failed to fetch management control data. Please try again.');
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -51,7 +75,7 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
     const { name, value, type, checked } = e.target;
     setNewManager({
       ...newManager,
-      [name]: type === 'checkbox' ? checked : value,
+      [name]: type === 'checkbox' ? checked : type === 'number' ? Number(value) : value,
     });
   };
 
@@ -60,7 +84,10 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
       alert('Please fill in the Name, ID Number, and Position.');
       return;
     }
-
+    if (managers.some((manager) => manager.idNumber === newManager.idNumber)) {
+      alert('A manager with this ID Number already exists.');
+      return;
+    }
     const updatedManagers = [...managers, newManager];
     setManagers(updatedManagers);
     resetNewManager();
@@ -77,7 +104,15 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
       alert('Please fill in the Name, ID Number, and Position.');
       return;
     }
-
+    if (
+      managers.some(
+        (manager, index) =>
+          manager.idNumber === newManager.idNumber && index !== editingManagerIndex
+      )
+    ) {
+      alert('A manager with this ID Number already exists.');
+      return;
+    }
     const updatedManagers = managers.map((manager, index) =>
       index === editingManagerIndex ? newManager : manager
     );
@@ -87,6 +122,122 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
     recalculateManagementData(updatedManagers);
   };
 
+  const deleteManager = async (index) => {
+    if (window.confirm('Are you sure you want to delete this manager?')) {
+      setIsLoading(true);
+      try {
+        const updatedManagers = managers.filter((_, i) => i !== index);
+        recalculateManagementData(updatedManagers);
+
+        const checkResponse = await fetch(`http://localhost:5000/management-control/${userId}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        });
+
+        if (checkResponse.ok) {
+          const { data } = await checkResponse.json();
+          if (data.length > 0) {
+            const existingId = data[0].id;
+            const response = await fetch(`http://localhost:5000/management-control/${existingId}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ userId, managers: updatedManagers, managementData }),
+            });
+
+            if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(`Failed to update manager data: ${errorData.error}`);
+            }
+          }
+        }
+
+        setManagers(updatedManagers);
+      } catch (error) {
+        console.error('Error deleting manager:', error);
+        alert(`Failed to delete manager: ${error.message}`);
+        const response = await fetch(`http://localhost:5000/management-control/${userId}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        });
+        if (response.ok) {
+          const { data } = await response.json();
+          if (data.length > 0) {
+            setManagers(data[0].managers);
+            setManagementData(data[0].managementData);
+            setDocumentId(data[0].id);
+          }
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  const deleteManagementControl = async () => {
+    if (window.confirm('Are you sure you want to delete all management control data for this user?')) {
+      setIsLoading(true);
+      try {
+        console.log('Sending DELETE request for userId:', userId);
+        const response = await fetch(`http://localhost:5000/management-control/${userId}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        });
+
+        console.log('DELETE response status:', response.status);
+        if (!response.ok) {
+          let errorData;
+          try {
+            errorData = await response.json();
+          } catch {
+            errorData = { error: `Server error (HTTP ${response.status})` };
+          }
+          throw new Error(`Failed to delete management control data: ${errorData.error || 'Unknown error'}`);
+        }
+
+        console.log('Management control data deleted');
+        setManagers([]);
+        setManagementData({
+          totalVotingRights: 0,
+          blackVotingRights: 0,
+          blackFemaleVotingRights: 0,
+          disabledVotingRights: 0,
+        });
+        setDocumentId(null);
+      } catch (error) {
+        console.error('Error deleting management control data:', error);
+        alert(`Failed to delete: ${error.message}`);
+        try {
+          const response = await fetch(`http://localhost:5000/management-control/${userId}`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+          });
+          if (response.ok) {
+            const { data } = await response.json();
+            if (data.length > 0) {
+              setManagers(data[0].managers || []);
+              setManagementData(data[0].managementData || {
+                totalVotingRights: 0,
+                blackVotingRights: 0,
+                blackFemaleVotingRights: 0,
+                disabledVotingRights: 0,
+              });
+              setDocumentId(data[0].id);
+              console.log('Restored documentId:', data[0].id);
+            }
+          }
+        } catch (fetchError) {
+          console.error('Error re-fetching data:', fetchError);
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
 
   const resetNewManager = () => {
     setNewManager({
@@ -111,7 +262,7 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
     let disabledVotingRights = 0;
 
     updatedManagers.forEach((manager) => {
-      const votingRights = Number(manager.votingRights);
+      const votingRights = Number(manager.votingRights) || 0;
       totalVotingRights += votingRights;
       if (manager.race.toLowerCase() === 'black') {
         blackVotingRights += votingRights;
@@ -132,28 +283,21 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
     });
   };
 
-  const handleManagementChange = (e) => {
-    const { name, value } = e.target;
-    setManagementData({
-      ...managementData,
-      [name]: Number(value),
-    });
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Submitting data:', { userId, managers, managementData });
+    console.log('Submitting data:', { userId, managers, managementData, documentId });
 
     if (!userId) {
       alert('User ID is missing. Please ensure you are logged in.');
       return;
     }
 
+    setIsLoading(true);
     try {
-      // Check if data exists to determine POST or PUT
       const checkResponse = await fetch(`http://localhost:5000/management-control/${userId}`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
       });
 
       let method = 'POST';
@@ -162,6 +306,7 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
 
       if (checkResponse.ok) {
         const { data } = await checkResponse.json();
+        console.log('Check response data:', data);
         if (data.length > 0) {
           method = 'PUT';
           existingId = data[0].id;
@@ -172,47 +317,30 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ userId, managers, managementData }),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch {
+          errorData = { error: `Server error (HTTP ${response.status})` };
+        }
         throw new Error(`Failed to save management control data: ${errorData.error || 'Unknown error'}`);
       }
 
       const result = await response.json();
       console.log('Management control data saved:', result);
+      setDocumentId(result.id);
       onSubmit({ managers, managementData });
       onClose();
     } catch (error) {
       console.error('Error saving management control data:', error);
       alert(`Failed to save management control data: ${error.message}`);
-    }
-  };
-
-  const deleteManagementControl = async () => {
-    try {
-      const response = await fetch(`http://localhost:5000/management-control/${userId}`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`Failed to delete management control data: ${errorData.error}`);
-      }
-
-      console.log('Management control data deleted');
-      setManagers([]);
-      setManagementData({
-        totalVotingRights: 0,
-        blackVotingRights: 0,
-        blackFemaleVotingRights: 0,
-        disabledVotingRights: 0,
-      });
-    } catch (error) {
-      console.error('Error deleting management control data:', error);
-      alert(`Failed to delete: ${error.message}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -222,7 +350,6 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
         <h2 className="text-xl font-semibold mb-4">Management Control Details</h2>
 
         <form onSubmit={handleSubmit}>
-          {/* Manager Input Form */}
           <div className="mb-6">
             <h3 className="text-lg font-medium mb-2">Add Manager</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -234,6 +361,8 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
                   value={newManager.name}
                   onChange={handleManagerChange}
                   className="w-full p-2 border rounded"
+                  placeholder="Enter name & surname"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -244,6 +373,8 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
                   value={newManager.siteLocation}
                   onChange={handleManagerChange}
                   className="w-full p-2 border rounded"
+                  placeholder="Enter site/location"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -254,6 +385,8 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
                   value={newManager.idNumber}
                   onChange={handleManagerChange}
                   className="w-full p-2 border rounded"
+                  placeholder="Enter ID number"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -264,6 +397,8 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
                   value={newManager.position}
                   onChange={handleManagerChange}
                   className="w-full p-2 border rounded"
+                  placeholder="Enter position"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -274,6 +409,8 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
                   value={newManager.jobTitle}
                   onChange={handleManagerChange}
                   className="w-full p-2 border rounded"
+                  placeholder="Enter job title"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -283,6 +420,7 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
                   value={newManager.race}
                   onChange={handleManagerChange}
                   className="w-full p-2 border rounded"
+                  disabled={isLoading}
                 >
                   <option value="">Select Race</option>
                   <option value="Black">Black</option>
@@ -299,6 +437,7 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
                   value={newManager.gender}
                   onChange={handleManagerChange}
                   className="w-full p-2 border rounded"
+                  disabled={isLoading}
                 >
                   <option value="">Select Gender</option>
                   <option value="Male">Male</option>
@@ -307,14 +446,15 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
                 </select>
               </div>
               <div className="flex items-center">
+                <label className="text-sm font-medium mr-2">Disabled</label>
                 <input
                   type="checkbox"
                   name="isDisabled"
                   checked={newManager.isDisabled}
                   onChange={handleManagerChange}
                   className="mr-2"
+                  disabled={isLoading}
                 />
-                <label className="text-sm font-medium">Disabled</label>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Voting Rights (%)</label>
@@ -326,45 +466,49 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
                   min="0"
                   max="100"
                   className="w-full p-2 border rounded"
+                  placeholder="Enter voting rights"
+                  disabled={isLoading}
                 />
               </div>
               <div className="flex items-center">
+                <label className="text-sm font-medium mr-2">Executive Director</label>
                 <input
                   type="checkbox"
                   name="isExecutiveDirector"
                   checked={newManager.isExecutiveDirector}
                   onChange={handleManagerChange}
                   className="mr-2"
+                  disabled={isLoading}
                 />
-                <label className="text-sm font-medium">Executive Director</label>
               </div>
               <div className="flex items-center">
+                <label className="text-sm font-medium mr-2">Independent Non-Executive</label>
                 <input
                   type="checkbox"
                   name="isIndependentNonExecutive"
                   checked={newManager.isIndependentNonExecutive}
                   onChange={handleManagerChange}
                   className="mr-2"
+                  disabled={isLoading}
                 />
-                <label className="text-sm font-medium">Independent Non-Executive</label>
               </div>
             </div>
             <button
               type="button"
               onClick={editingManagerIndex !== null ? saveEditedManager : addManager}
-              className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+              className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:bg-blue-300"
+              disabled={isLoading}
             >
               {editingManagerIndex !== null ? 'Save Edited Manager' : 'Add Manager'}
             </button>
           </div>
 
-          {/* Managers Table */}
           {managers.length > 0 && (
             <div className="mb-6">
               <h3 className="text-lg font-medium mb-2">Managers List</h3>
               <div className="overflow-x-auto">
                 <table className="min-w-full border-collapse border border-gray-300">
-                  <thead>
+                  <thead	cinTableHeader>
                     <tr className="bg-gray-200">
                       <th className="border border-gray-300 px-4 py-2">Name & Surname</th>
                       <th className="border border-gray-300 px-4 py-2">Site/Location</th>
@@ -382,7 +526,7 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
                   </thead>
                   <tbody>
                     {managers.map((manager, index) => (
-                      <tr key={index}>
+                      <tr key={manager.idNumber}>
                         <td className="border border-gray-300 px-4 py-2">{manager.name}</td>
                         <td className="border border-gray-300 px-4 py-2">{manager.siteLocation}</td>
                         <td className="border border-gray-300 px-4 py-2">{manager.idNumber}</td>
@@ -398,14 +542,16 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
                           <button
                             type="button"
                             onClick={() => editManager(index)}
-                            className="bg-yellow-500 text-white px-2 py-1 rounded mr-2 hover:bg-yellow-600"
+                            className="bg-yellow-500 text-white px-2 py-1 rounded mr-2 hover:bg-yellow-600 disabled:bg-yellow-300"
+                            disabled={isLoading}
                           >
                             Edit
                           </button>
                           <button
                             type="button"
-                            onClick={deleteManagementControl}
-                            className="bg-red-500 text-white px-2 py-1 rounded mr-2 hover:bg-red-600"
+                            onClick={() => deleteManager(index)}
+                            className="bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700 disabled:bg-red-300"
+                            disabled={isLoading}
                           >
                             Delete
                           </button>
@@ -418,19 +564,14 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
             </div>
           )}
 
-          {/* Aggregated Management Data */}
           <div className="mb-6">
-            <h3 className="text-lg font-medium mb-2">Aggregated Management Summary</h3>
+            <h3 className="text-lg font-medium mb-2">Management Control Summary</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Total Voting Rights (%)</label>
                 <input
                   type="number"
-                  name="totalVotingRights"
                   value={managementData.totalVotingRights}
-                  onChange={handleManagementChange}
-                  min="0"
-                  max="100"
                   className="w-full p-2 border rounded"
                   disabled
                 />
@@ -439,11 +580,7 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
                 <label className="block text-sm font-medium mb-1">Black Voting Rights (%)</label>
                 <input
                   type="number"
-                  name="blackVotingRights"
                   value={managementData.blackVotingRights}
-                  onChange={handleManagementChange}
-                  min="0"
-                  max="100"
                   className="w-full p-2 border rounded"
                   disabled
                 />
@@ -452,11 +589,7 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
                 <label className="block text-sm font-medium mb-1">Black Female Voting Rights (%)</label>
                 <input
                   type="number"
-                  name="blackFemaleVotingRights"
                   value={managementData.blackFemaleVotingRights}
-                  onChange={handleManagementChange}
-                  min="0"
-                  max="100"
                   className="w-full p-2 border rounded"
                   disabled
                 />
@@ -465,11 +598,7 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
                 <label className="block text-sm font-medium mb-1">Disabled Voting Rights (%)</label>
                 <input
                   type="number"
-                  name="disabledVotingRights"
                   value={managementData.disabledVotingRights}
-                  onChange={handleManagementChange}
-                  min="0"
-                  max="100"
                   className="w-full p-2 border rounded"
                   disabled
                 />
@@ -481,16 +610,25 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
             <button
               type="button"
               onClick={onClose}
-              className="bg-gray-200 text-gray-800 px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-gray-300 w-full sm:w-auto transition-all duration-200"
+              className="bg-gray-200 text-gray-800 px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-gray-300 w-full sm:w-auto transition-all duration-200 disabled:bg-gray-100"
+              disabled={isLoading}
             >
               Cancel
             </button>
-           
+            <button
+              type="button"
+              onClick={deleteManagementControl}
+              className="bg-red-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-red-700 w-full sm:w-auto transition-all duration-200 disabled:bg-red-300"
+              disabled={isLoading || !documentId}
+            >
+              Delete All Data
+            </button>
             <button
               type="submit"
-              className="bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-blue-700 w-full sm:w-auto transition-all duration-200"
+              className="bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-blue-700 w-full sm:w-auto transition-all duration-200 disabled:bg-blue-300"
+              disabled={isLoading}
             >
-              Save Management Details
+              Save Management Control Details
             </button>
           </div>
         </form>

@@ -41,6 +41,7 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
       return acc;
     }, {}),
   });
+  const [isLoading, setIsLoading] = useState(false);
 
   // Fetch existing data on mount
   useEffect(() => {
@@ -106,6 +107,56 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
     recalculateEmploymentData(updatedEmployees);
   };
 
+  const deleteEmployee = async (index) => {
+    if (window.confirm('Are you sure you want to delete this employee?')) {
+      setIsLoading(true);
+      try {
+        const updatedEmployees = employees.filter((_, i) => i !== index);
+        recalculateEmploymentData(updatedEmployees);
+
+        // Check if data exists to get the document ID
+        const checkResponse = await fetch(`http://localhost:5000/employment-equity/${userId}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (checkResponse.ok) {
+          const { data } = await checkResponse.json();
+          if (data.length > 0) {
+            const existingId = data[0].id;
+            // Update Firestore with the new employee list
+            const response = await fetch(`http://localhost:5000/employment-equity/${existingId}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId, employees: updatedEmployees, employmentData }),
+            });
+
+            if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(`Failed to update employee data: ${errorData.error}`);
+            }
+          }
+        }
+
+        setEmployees(updatedEmployees);
+      } catch (error) {
+        console.error('Error deleting employee:', error);
+        alert(`Failed to delete employee: ${error.message}`);
+        // Revert state if needed
+        const response = await fetch(`http://localhost:5000/employment-equity/${userId}`);
+        if (response.ok) {
+          const { data } = await response.json();
+          if (data.length > 0) {
+            setEmployees(data[0].employees);
+            setEmploymentData(data[0].employmentData);
+          }
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
   const resetNewEmployee = () => {
     setNewEmployee({
       name: '',
@@ -168,7 +219,7 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
       blackFemaleEmployees,
       disabledEmployees,
       foreignEmployees,
- byOccupationalLevel,
+      byOccupationalLevel,
     });
   };
 
@@ -181,6 +232,7 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
       return;
     }
 
+    setIsLoading(true);
     try {
       // Check if data exists to determine POST or PUT
       const checkResponse = await fetch(`http://localhost:5000/employment-equity/${userId}`, {
@@ -219,42 +271,58 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
     } catch (error) {
       console.error('Error saving employment equity data:', error);
       alert(`Failed to save employment equity data: ${error.message}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const deleteEmploymentEquity = async () => {
-    try {
-      const response = await fetch(`http://localhost:5000/employment-equity/${userId}`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-      });
+    if (window.confirm('Are you sure you want to delete all employment equity data for this user?')) {
+      setIsLoading(true);
+      try {
+        const response = await fetch(`http://localhost:5000/employment-equity/${userId}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`Failed to delete employment equity data: ${errorData.error}`);
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(`Failed to delete employment equity data: ${errorData.error}`);
+        }
+
+        console.log('Employment equity data deleted');
+        setEmployees([]);
+        setEmploymentData({
+          totalEmployees: 0,
+          blackEmployees: 0,
+          blackFemaleEmployees: 0,
+          disabledEmployees: 0,
+          foreignEmployees: 0,
+          byOccupationalLevel: occupationalLevels.reduce((acc, level) => {
+            acc[level] = {
+              total: 0,
+              black: 0,
+              blackFemale: 0,
+              disabled: 0,
+            };
+            return acc;
+          }, {}),
+        });
+      } catch (error) {
+        console.error('Error deleting employment equity data:', error);
+        alert(`Failed to delete: ${error.message}`);
+        // Re-fetch data to restore state
+        const response = await fetch(`http://localhost:5000/employment-equity/${userId}`);
+        if (response.ok) {
+          const { data } = await response.json();
+          if (data.length > 0) {
+            setEmployees(data[0].employees);
+            setEmploymentData(data[0].employmentData);
+          }
+        }
+      } finally {
+        setIsLoading(false);
       }
-
-      console.log('Employment equity data deleted');
-      setEmployees([]);
-      setEmploymentData({
-        totalEmployees: 0,
-        blackEmployees: 0,
-        blackFemaleEmployees: 0,
-        disabledEmployees: 0,
-        foreignEmployees: 0,
-        byOccupationalLevel: occupationalLevels.reduce((acc, level) => {
-          acc[level] = {
-            total: 0,
-            black: 0,
-            blackFemale: 0,
-            disabled: 0,
-          };
-          return acc;
-        }, {}),
-      });
-    } catch (error) {
-      console.error('Error deleting employment equity data:', error);
-      alert(`Failed to delete: ${error.message}`);
     }
   };
 
@@ -277,6 +345,7 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
                   onChange={handleEmployeeChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter name & surname"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -288,6 +357,7 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
                   onChange={handleEmployeeChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter site/location"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -299,6 +369,7 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
                   onChange={handleEmployeeChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter ID number"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -310,6 +381,7 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
                   onChange={handleEmployeeChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter job title"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -319,6 +391,7 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
                   value={newEmployee.race}
                   onChange={handleEmployeeChange}
                   className="w-full p-2 border rounded"
+                  disabled={isLoading}
                 >
                   <option value="">Select Race</option>
                   <option value="Black">Black</option>
@@ -332,9 +405,10 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
                 <label className="block text-sm font-medium mb-1">Gender</label>
                 <select
                   name="gender"
-                  value={newEmployee.race}
+                  value={newEmployee.gender}
                   onChange={handleEmployeeChange}
                   className="w-full p-2 border rounded"
+                  disabled={isLoading}
                 >
                   <option value="">Select Gender</option>
                   <option value="Male">Male</option>
@@ -349,6 +423,7 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
                   checked={newEmployee.isDisabled}
                   onChange={handleEmployeeChange}
                   className="mr-2"
+                  disabled={isLoading}
                 />
                 <label className="text-sm font-medium">Disabled</label>
               </div>
@@ -361,7 +436,7 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
                   onChange={handleEmployeeChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter description of disability"
-                  disabled={!newEmployee.isDisabled}
+                  disabled={!newEmployee.isDisabled || isLoading}
                 />
               </div>
               <div className="flex items-center">
@@ -371,6 +446,7 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
                   checked={newEmployee.isForeign}
                   onChange={handleEmployeeChange}
                   className="mr-2"
+                  disabled={isLoading}
                 />
                 <label className="text-sm font-medium">Foreign</label>
               </div>
@@ -381,6 +457,7 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
                   value={newEmployee.occupationalLevel}
                   onChange={handleEmployeeChange}
                   className="w-full p-2 border rounded"
+                  disabled={isLoading}
                 >
                   <option value="">Select Occupational Level</option>
                   {occupationalLevels.map((level) => (
@@ -400,13 +477,15 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
                   min="0"
                   className="w-full p-2 border rounded"
                   placeholder="Enter gross monthly salary"
+                  disabled={isLoading}
                 />
               </div>
             </div>
             <button
               type="button"
               onClick={editingEmployeeIndex !== null ? saveEditedEmployee : addEmployee}
-              className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+              className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:bg-blue-300"
+              disabled={isLoading}
             >
               {editingEmployeeIndex !== null ? 'Save Edited Employee' : 'Add Employee'}
             </button>
@@ -452,17 +531,19 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
                           <button
                             type="button"
                             onClick={() => editEmployee(index)}
-                            className="bg-yellow-500 text-white px-2 py-1 rounded mr-2 hover:bg-yellow-600"
+                            className="bg-yellow-500 text-white px-2 py-1 rounded mr-2 hover:bg-yellow-600 disabled:bg-yellow-300"
+                            disabled={isLoading}
                           >
                             Edit
                           </button>
                           <button
-              type="button"
-              onClick={deleteEmploymentEquity}
-              className="bg-red-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-red-700 w-full sm:w-auto transition-all duration-200"
-            >
-              Delete
-            </button>
+                            type="button"
+                            onClick={() => deleteEmployee(index)}
+                            className="bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700 disabled:bg-red-300"
+                            disabled={isLoading}
+                          >
+                            Delete
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -555,13 +636,23 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
             <button
               type="button"
               onClick={onClose}
-              className="bg-gray-200 text-gray-800 px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-gray-300 w-full sm:w-auto transition-all duration-200"
+              className="bg-gray-200 text-gray-800 px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-gray-300 w-full sm:w-auto transition-all duration-200 disabled:bg-gray-100"
+              disabled={isLoading}
             >
               Cancel
             </button>
             <button
+              type="button"
+              onClick={deleteEmploymentEquity}
+              className="bg-red-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-red-700 w-full sm:w-auto transition-all duration-200 disabled:bg-red-300"
+              disabled={isLoading}
+            >
+              Delete All Data
+            </button>
+            <button
               type="submit"
-              className="bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-blue-700 w-full sm:w-auto transition-all duration-200"
+              className="bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-blue-700 w-full sm:w-auto transition-all duration-200 disabled:bg-blue-300"
+              disabled={isLoading}
             >
               Save Employment Equity Details
             </button>

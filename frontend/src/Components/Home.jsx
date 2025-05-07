@@ -56,7 +56,7 @@ const Home = () => {
   const [socioEconomicDevelopmentDetails, setSocioEconomicDevelopmentDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [assessmentStarted, setAssessmentStarted] = useState(false); // New state to track assessment status
+  const [assessmentStarted, setAssessmentStarted] = useState(false);
 
   // Format Firestore Timestamp to DD/MMM/YYYY
   const formatDate = (timestamp) => {
@@ -81,13 +81,18 @@ const Home = () => {
     }
   };
 
-  // Placeholder for fetching user profile
-  
+  // Fetch user profile from backend
   const fetchUserProfile = async (uid) => {
     try {
+      console.log("Fetching profile for UID:", uid);
       const response = await fetch(`http://localhost:5000/get-profile?uid=${uid}`);
-      if (!response.ok) throw new Error(`Failed to fetch profile: ${response.statusText}`);
+      console.log("Fetch response status:", response.status, "OK:", response.ok);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Failed to fetch profile: ${response.status} ${response.statusText}, ${errorData.error || "Unknown error"}`);
+      }
       const data = await response.json();
+      console.log("Profile data received:", data);
       setFinancialData((prevData) => ({
         ...prevData,
         companyName: data.businessName || prevData.companyName,
@@ -99,11 +104,43 @@ const Home = () => {
         sector: data.sector || financialData.sector,
       });
     } catch (err) {
-      console.error("Fetch profile error:", err);
-      setError("Failed to fetch profile data from server");
+      console.error("Fetch profile error:", err.message);
+      setError(`Failed to fetch profile data: ${err.message}`);
     }
   };
-  
+
+  // Save profile changes to backend
+  const handleSave = async () => {
+    try {
+      const payload = {
+        uid: userId,
+        businessName: financialData.companyName,
+        sector: financialData.sector,
+      };
+      console.log("Saving profile for UID:", userId, "Payload:", payload);
+      const res = await fetch("http://localhost:5000/update-profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      console.log("Save response status:", res.status, "OK:", res.ok);
+      if (!res.ok) {
+        const errorData = await res.json();
+        console.error("Save error response:", errorData);
+        throw new Error(`Failed to save changes: ${res.status} ${res.statusText}, ${errorData.error || "Unknown error"}`);
+      }
+      const updatedData = await res.json();
+      console.log("Profile updated successfully:", updatedData);
+      setOriginalData({
+        companyName: financialData.companyName,
+        sector: financialData.sector,
+      });
+      setIsDirty(false);
+    } catch (err) {
+      console.error("Error saving profile:", err.message);
+      setError(`Failed to save changes: ${err.message}`);
+    }
+  };
 
   // Initialize user data
   useEffect(() => {
@@ -129,14 +166,15 @@ const Home = () => {
           yearEnd: formattedYearEnd || '',
           sector: userData.sector || '',
         };
+        console.log("Initial data set:", initialData);
         setFinancialData((prevData) => ({
           ...prevData,
           ...initialData,
         }));
         setOriginalData({ companyName: initialData.companyName, sector: initialData.sector });
 
-        // Fetch profile data (commented out for frontend-only)
-        // await fetchUserProfile(userData.uid);
+        // Fetch profile data from backend
+        await fetchUserProfile(userData.uid);
       } catch (err) {
         console.error("Error processing data:", err);
         setError("Failed to load company data");
@@ -162,34 +200,6 @@ const Home = () => {
       return newData;
     });
   };
-
-  // Placeholder for saving profile changes (commented out)
-  
-  const handleSave = async () => {
-    try {
-      const res = await fetch("http://localhost:5000/update-profile", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          uid: userId,
-          businessName: financialData.companyName,
-          sector: financialData.sector,
-        }),
-      });
-      if (!res.ok) throw new Error(`Failed to save changes: ${res.statusText}`);
-      const updatedData = await res.json();
-      setOriginalData({
-        companyName: financialData.companyName,
-        sector: financialData.sector,
-      });
-      setIsDirty(false);
-      console.log("Profile updated:", updatedData);
-    } catch (err) {
-      console.error("Error saving profile:", err);
-      setError("Failed to save changes");
-    }
-  };
-  
 
   // Start New Assessment
   const startNewAssessment = () => {
@@ -225,12 +235,12 @@ const Home = () => {
     console.log('Started new assessment');
   };
 
-  // Load Saved Assessment (placeholder for frontend-only)
+  // Load Saved Assessment
   const loadSavedAssessment = () => {
-    // Simulate loading data (replace with backend fetch later)
+    // Simulate loading data
     setFinancialData((prevData) => ({
       ...prevData,
-      turnover: 1000000, // Example data
+      turnover: 1000000,
       npbt: 200000,
       npat: 150000,
       sdlPayments: 50000,
@@ -242,48 +252,6 @@ const Home = () => {
     setSkillsDevelopmentDetails({ summary: { totalDirectExpenditure: 60000, totalTrainings: 10 } });
     setAssessmentStarted(true);
     console.log('Loaded saved assessment (simulated)');
-    
-    // Backend fetch (uncomment when backend is ready)
-    
-    const fetchAssessment = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch(`http://localhost:5000/get-assessment?uid=${userId}`);
-        if (!response.ok) {
-          if (response.status === 404) {
-            setError('No saved assessment found');
-            return;
-          }
-          throw new Error(`Failed to load assessment: ${response.statusText}`);
-        }
-        const data = await response.json();
-        setFinancialData((prevData) => ({
-          ...prevData,
-          ...data.financialData,
-          companyName: data.financialData?.companyName || originalData.companyName,
-          sector: data.financialData?.sector || originalData.sector,
-          yearEnd: data.financialData?.yearEnd || prevData.yearEnd,
-        }));
-        setOwnershipDetails(data.ownershipDetails || null);
-        setManagementDetails(data.managementDetails || null);
-        setEmploymentDetails(data.employmentDetails || null);
-        setYesDetails(data.yesDetails || null);
-        setSkillsDevelopmentDetails(data.skillsDevelopmentDetails || null);
-        setSupplierDevelopmentDetails(data.supplierDevelopmentDetails || null);
-        setEnterpriseDevelopmentDetails(data.enterpriseDevelopmentDetails || null);
-        setSocioEconomicDevelopmentDetails(data.socioEconomicDevelopmentDetails || null);
-        setIsDirty(false);
-        setAssessmentStarted(true);
-        console.log('Loaded saved assessment:', data);
-      } catch (err) {
-        console.error('Error loading assessment:', err);
-        setError(err.message || 'Failed to load saved assessment');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchAssessment();
-    
   };
 
   const handleOwnershipSubmit = (data) => {
@@ -550,7 +518,6 @@ const Home = () => {
               className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-600"
             />
           </div>
-
           <div>
             <label className="block text-sm font-medium mb-1">Financial Year End</label>
             <input
@@ -581,7 +548,7 @@ const Home = () => {
         {isDirty && (
           <div className="mt-4 flex justify-end">
             <button
-              onClick={() => console.log('Save Changes clicked')} // Placeholder
+              onClick={handleSave}
               className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
             >
               Save Changes
@@ -590,7 +557,7 @@ const Home = () => {
         )}
       </div>
 
-      {/* Remaining Sections (shown only after assessment is started or loaded) */}
+      {/* Remaining Sections */}
       {assessmentStarted && (
         <>
           {/* Financial Information */}

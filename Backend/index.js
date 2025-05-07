@@ -289,6 +289,7 @@ app.post("/admin-login", async (req, res) => {
     return res.status(500).json({ error: "Something went wrong", code: error.code });
   }
 });
+
 // Check admin status
 app.get("/check-admin", async (req, res) => {
   const authHeader = req.headers.authorization;
@@ -461,27 +462,67 @@ app.post("/signup", async (req, res) => {
   }
 });
 
-// Update-profile endpoint (unchanged)
+// Get-profile endpoint
+app.get("/get-profile", async (req, res) => {
+  const { uid } = req.query;
+  console.log("Get profile request for UID:", uid);
+
+  try {
+    if (!uid) {
+      console.log("Missing UID in request");
+      return res.status(400).json({ error: "User ID is required" });
+    }
+
+    const clientDoc = await getDoc(doc(db, "clients", uid));
+    if (!clientDoc.exists()) {
+      console.log("Client not found for UID:", uid);
+      return res.status(404).json({ error: "Client not found" });
+    }
+
+    const data = clientDoc.data();
+    console.log("Profile data retrieved:", data);
+
+    res.status(200).json({
+      businessName: data.businessName || "",
+      sector: data.sector || "",
+      financialYearEnd: data.financialYearEnd || null,
+      address: data.address || "",
+      contactNumber: data.contactNumber || "",
+      businessEmail: data.businessEmail || "",
+    });
+  } catch (error) {
+    console.error("Get profile error:", error.code, error.message);
+    res.status(500).json({ error: "Failed to fetch profile", code: error.code });
+  }
+});
+
+// Update-profile endpoint
 app.patch("/update-profile", async (req, res) => {
   const { uid, businessName, sector } = req.body;
   console.log("Update profile request:", { uid, businessName, sector });
 
   try {
     if (!uid) {
+      console.log("Missing UID in request");
       return res.status(400).json({ error: "User ID is required" });
     }
     if (!businessName || !sector) {
+      console.log("Missing required fields:", { businessName, sector });
       return res.status(400).json({ error: "Business name and sector are required" });
     }
 
-    await setDoc(doc(db, "users", uid), { businessName, sector }, { merge: true });
+    await setDoc(
+      doc(db, "clients", uid),
+      { businessName, sector },
+      { merge: true }
+    );
+    console.log("Profile updated in Firestore for UID:", uid);
     res.status(200).json({ message: "Profile updated", businessName, sector });
   } catch (error) {
-    console.error("Update error:", error);
-    res.status(500).json({ error: "Failed to update profile" });
+    console.error("Update error:", error.code, error.message);
+    res.status(500).json({ error: "Failed to update profile", code: error.code });
   }
 });
-
 // Login route (for clients)
 app.post("/login", async (req, res) => {
   const { businessEmail, password } = req.body;
@@ -562,13 +603,13 @@ app.post('/management-control', async (req, res) => {
       return res.status(400).json({ error: 'Management data must be an object' });
     }
 
-    const userDoc = await adminDb.collection('users').doc(userId).get();
+    const userDoc = await admin.firestore().collection('clients').doc(userId).get();
     if (!userDoc.exists) {
       console.log('User not found for userId:', userId);
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const managementRef = adminDb.collection('managementControl');
+    const managementRef = admin.firestore().collection('managementControl');
     const q = await managementRef.where('userId', '==', userId).get();
     if (!q.empty) {
       console.log('Management control already exists for userId:', userId);
@@ -603,8 +644,7 @@ app.post('/management-control', async (req, res) => {
       updatedAt: new Date().toISOString(),
     };
 
-    console.log('Attempting to write to managementControl for userId:', userId);
-    const docRef = await adminDb.collection('managementControl').add(managementControlData);
+    const docRef = await admin.firestore().collection('managementControl').add(managementControlData);
     console.log('Write successful, doc ID:', docRef.id);
 
     res.status(201).json({
@@ -629,7 +669,7 @@ app.get('/management-control/:userId', async (req, res) => {
       return res.status(400).json({ error: 'User ID is required' });
     }
 
-    const querySnapshot = await adminDb.collection('managementControl').where('userId', '==', userId).get();
+    const querySnapshot = await admin.firestore().collection('managementControl').where('userId', '==', userId).get();
     const managementRecords = querySnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
@@ -671,13 +711,13 @@ app.put('/management-control/:id', async (req, res) => {
       return res.status(400).json({ error: 'Management data must be an object' });
     }
 
-    const userDoc = await adminDb.collection('users').doc(userId).get();
+    const userDoc = await admin.firestore().collection('clients').doc(userId).get();
     if (!userDoc.exists) {
       console.log('User not found for userId:', userId);
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const docRef = adminDb.collection('managementControl').doc(id);
+    const docRef = admin.firestore().collection('managementControl').doc(id);
     const existingDoc = await docRef.get();
     if (!existingDoc.exists) {
       console.log('Management control data not found for id:', id);
@@ -741,13 +781,13 @@ app.delete('/management-control/:userId', async (req, res) => {
       return res.status(400).json({ error: 'User ID is required' });
     }
 
-    const userDoc = await adminDb.collection('users').doc(userId).get();
+    const userDoc = await admin.firestore().collection('clients').doc(userId).get();
     if (!userDoc.exists) {
       console.log('User not found for userId:', userId);
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const managementRef = adminDb.collection('managementControl');
+    const managementRef = admin.firestore().collection('managementControl');
     const query = await managementRef.where('userId', '==', userId).get();
 
     if (query.empty) {
@@ -756,7 +796,7 @@ app.delete('/management-control/:userId', async (req, res) => {
     }
 
     const docToDelete = query.docs[0];
-    await adminDb.collection('managementControl').doc(docToDelete.id).delete();
+    await admin.firestore().collection('managementControl').doc(docToDelete.id).delete();
 
     console.log('Management control data deleted for userId:', userId);
     res.status(200).json({
@@ -789,13 +829,13 @@ app.post('/employment-equity', async (req, res) => {
       return res.status(400).json({ error: 'Employment data must be an object' });
     }
 
-    const userDoc = await adminDb.collection('users').doc(userId).get();
+    const userDoc = await admin.firestore().collection('clients').doc(userId).get();
     if (!userDoc.exists) {
       console.log('User not found for userId:', userId);
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const employmentRef = adminDb.collection('employmentEquityDetails');
+    const employmentRef = admin.firestore().collection('employmentEquityDetails');
     const q = await employmentRef.where('userId', '==', userId).get();
     if (!q.empty) {
       console.log('Employment equity already exists for userId:', userId);
@@ -832,7 +872,7 @@ app.post('/employment-equity', async (req, res) => {
       updatedAt: new Date().toISOString(),
     };
 
-    const docRef = await adminDb.collection('employmentEquityDetails').add(employmentEquityData);
+    const docRef = await admin.firestore().collection('employmentEquityDetails').add(employmentEquityData);
     console.log('Write successful, doc ID:', docRef.id);
 
     res.status(201).json({
@@ -857,7 +897,7 @@ app.get('/employment-equity/:userId', async (req, res) => {
       return res.status(400).json({ error: 'User ID is required' });
     }
 
-    const querySnapshot = await adminDb.collection('employmentEquityDetails').where('userId', '==', userId).get();
+    const querySnapshot = await admin.firestore().collection('employmentEquityDetails').where('userId', '==', userId).get();
     const employmentRecords = querySnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
@@ -899,13 +939,13 @@ app.put('/employment-equity/:id', async (req, res) => {
       return res.status(400).json({ error: 'Employment data must be an object' });
     }
 
-    const userDoc = await adminDb.collection('users').doc(userId).get();
+    const userDoc = await admin.firestore().collection('clients').doc(userId).get();
     if (!userDoc.exists) {
       console.log('User not found for userId:', userId);
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const docRef = adminDb.collection('employmentEquityDetails').doc(id);
+    const docRef = admin.firestore().collection('employmentEquityDetails').doc(id);
     const existingDoc = await docRef.get();
     if (!existingDoc.exists) {
       console.log('Employment equity data not found for id:', id);
@@ -971,13 +1011,13 @@ app.delete('/employment-equity/:userId', async (req, res) => {
       return res.status(400).json({ error: 'User ID is required' });
     }
 
-    const userDoc = await adminDb.collection('users').doc(userId).get();
+    const userDoc = await admin.firestore().collection('clients').doc(userId).get();
     if (!userDoc.exists) {
       console.log('User not found for userId:', userId);
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const employmentRef = adminDb.collection('employmentEquityDetails');
+    const employmentRef = admin.firestore().collection('employmentEquityDetails');
     const query = await employmentRef.where('userId', '==', userId).get();
 
     if (query.empty) {
@@ -986,7 +1026,7 @@ app.delete('/employment-equity/:userId', async (req, res) => {
     }
 
     const docToDelete = query.docs[0];
-    await adminDb.collection('employmentEquityDetails').doc(docToDelete.id).delete();
+    await admin.firestore().collection('employmentEquityDetails').doc(docToDelete.id).delete();
 
     console.log('Employment equity data deleted for userId:', userId);
     res.status(200).json({
@@ -1019,7 +1059,7 @@ app.post('/yes4youth-initiative', async (req, res) => {
       return res.status(400).json({ error: 'YES data must be an object' });
     }
 
-    const userDoc = await adminDb.collection('users').doc(userId).get();
+    const userDoc = await adminDb.collection('clients').doc(userId).get();
     if (!userDoc.exists) {
       console.log('User not found for userId:', userId);
       return res.status(404).json({ error: 'User not found' });
@@ -1251,7 +1291,7 @@ app.post('/skills-development', async (req, res) => {
       return res.status(400).json({ error: 'Summary must be an object' });
     }
 
-    const userDoc = await adminDb.collection('users').doc(userId).get();
+    const userDoc = await adminDb.collection('clients').doc(userId).get();
     if (!userDoc.exists) {
       console.log('User not found for userId:', userId);
       return res.status(404).json({ error: 'User not found' });
@@ -1505,7 +1545,7 @@ app.post("/ownership-details", async (req, res) => {
       return res.status(400).json({ error: "Ownership data must be an object" });
     }
 
-    const userDoc = await adminDb.collection("users").doc(userId).get();
+    const userDoc = await adminDb.collection("clients").doc(userId).get();
     if (!userDoc.exists) {
       console.log("User not found for userId:", userId);
       return res.status(404).json({ error: "User not found" });
@@ -1807,7 +1847,7 @@ app.post("/enterprise-development", async (req, res) => {
       return res.status(400).json({ error: "Summary must be an object" });
     }
 
-    const userDoc = await getDoc(doc(db, "users", userId));
+    const userDoc = await getDoc(doc(db, "clients", userId));
     if (!userDoc.exists()) {
       console.log("User not found for userId:", userId);
       return res.status(404).json({ error: "User not found" });
@@ -1902,7 +1942,7 @@ app.post("/socio-economic-development", async (req, res) => {
       return res.status(400).json({ error: "Summary must be an object" });
     }
 
-    const userDoc = await getDoc(doc(db, "users", userId));
+    const userDoc = await getDoc(doc(db, "clients", userId));
     if (!userDoc.exists()) {
       console.log("User not found for userId:", userId);
       return res.status(404).json({ error: "User not found" });
@@ -1972,38 +2012,5 @@ app.get("/socio-economic-development/:userId", async (req, res) => {
   }
 });
 
-// Get-profile endpoint (unchanged)
-app.get("/get-profile", async (req, res) => {
-  const { uid } = req.query;
-  console.log("Get profile request for UID:", uid);
-
-  try {
-    if (!uid) {
-      console.log("Missing UID in request");
-      return res.status(400).json({ error: "User ID is required" });
-    }
-
-    const userDoc = await getDoc(doc(db, "users", uid));
-    if (!userDoc.exists()) {
-      console.log("User not found for UID:", uid);
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    const data = userDoc.data();
-    console.log("Profile data retrieved:", data);
-
-    res.status(200).json({
-      businessName: data.businessName || '',
-      sector: data.sector || '',
-      financialYearEnd: data.financialYearEnd || null,
-      address: data.address || '',
-      contactNumber: data.contactNumber || '',
-      businessEmail: data.businessEmail || '',
-    });
-  } catch (error) {
-    console.error("Get profile error:", error.code, error.message);
-    res.status(500).json({ error: "Failed to fetch profile", code: error.code });
-  }
-});
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
