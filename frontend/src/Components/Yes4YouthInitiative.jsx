@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 
 const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
+  console.log('Yes4YouthInitiative rendered with userId:', userId);
+
   const occupationalLevels = [
     'Executive Management',
     'Other Executive Management',
@@ -34,11 +36,15 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
     currentYesEmployees: 0,
     completedYesAbsorbed: 0,
   });
+  const [documentId, setDocumentId] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Fetch existing data on mount
   useEffect(() => {
     const fetchData = async () => {
+      setIsLoading(true);
       try {
+        console.log('Fetching YES initiative data for userId:', userId);
         const response = await fetch(`http://localhost:5000/yes4youth-initiative/${userId}`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
@@ -46,13 +52,80 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
 
         if (response.ok) {
           const { data } = await response.json();
+          console.log('Fetched YES initiative data:', data);
           if (data.length > 0) {
-            setParticipants(data[0].participants);
-            setYesData(data[0].yesData);
+            setParticipants(data[0].participants || []);
+            setYesData(data[0].yesData || {
+              totalParticipants: 0,
+              blackYouthParticipants: 0,
+              totalStipendPaid: 0,
+              currentYesEmployees: 0,
+              completedYesAbsorbed: 0,
+            });
+            setDocumentId(data[0].id);
+            console.log('Set documentId:', data[0].id);
+          } else {
+            console.log('No YES initiative data found for userId:', userId);
+            // Allow form to load empty
+            setParticipants([]);
+            setYesData({
+              totalParticipants: 0,
+              blackYouthParticipants: 0,
+              totalStipendPaid: 0,
+              currentYesEmployees: 0,
+              completedYesAbsorbed: 0,
+            });
+            setDocumentId(null);
+          }
+        } else {
+          let errorMessage = `HTTP ${response.status}`;
+          let errorData;
+          try {
+            errorData = await response.json();
+            errorMessage = errorData.message || errorData.error || errorMessage;
+          } catch {
+            console.warn('Failed to parse error response');
+          }
+          console.warn('GET request failed with status:', response.status, 'Message:', errorMessage);
+          // Suppress alert for "No YES 4 Youth Initiative data found" 404
+          if (response.status === 404 && errorMessage === 'No YES 4 Youth Initiative data found for this user') {
+            setParticipants([]);
+            setYesData({
+              totalParticipants: 0,
+              blackYouthParticipants: 0,
+              totalStipendPaid: 0,
+              currentYesEmployees: 0,
+              completedYesAbsorbed: 0,
+            });
+            setDocumentId(null);
+          } else {
+            alert(`Failed to fetch YES initiative data: ${errorMessage}`);
+            setParticipants([]);
+            setYesData({
+              totalParticipants: 0,
+              blackYouthParticipants: 0,
+              totalStipendPaid: 0,
+              currentYesEmployees: 0,
+              completedYesAbsorbed: 0,
+            });
+            setDocumentId(null);
           }
         }
       } catch (error) {
         console.error('Error fetching YES initiative data:', error);
+        alert(`Failed to fetch YES initiative data: ${error.message}`);
+        // Allow form to load empty
+        setParticipants([]);
+        setYesData({
+          totalParticipants: 0,
+          blackYouthParticipants: 0,
+          totalStipendPaid: 0,
+          currentYesEmployees: 0,
+          completedYesAbsorbed: 0,
+        });
+        setDocumentId(null);
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -63,7 +136,7 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
     const { name, value, type, checked } = e.target;
     setNewParticipant({
       ...newParticipant,
-      [name]: type === 'checkbox' ? checked : value,
+      [name]: type === 'checkbox' ? checked : type === 'number' ? Number(value) : value,
     });
   };
 
@@ -72,7 +145,10 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
       alert('Please fill in the Name, ID Number, Job Title, and Start Date.');
       return;
     }
-
+    if (participants.some((participant) => participant.idNumber === newParticipant.idNumber)) {
+      alert('A participant with this ID Number already exists.');
+      return;
+    }
     const updatedParticipants = [...participants, newParticipant];
     setParticipants(updatedParticipants);
     resetNewParticipant();
@@ -89,7 +165,15 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
       alert('Please fill in the Name, ID Number, Job Title, and Start Date.');
       return;
     }
-
+    if (
+      participants.some(
+        (participant, index) =>
+          participant.idNumber === newParticipant.idNumber && index !== editingParticipantIndex
+      )
+    ) {
+      alert('A participant with this ID Number already exists.');
+      return;
+    }
     const updatedParticipants = participants.map((participant, index) =>
       index === editingParticipantIndex ? newParticipant : participant
     );
@@ -99,6 +183,157 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
     recalculateYesData(updatedParticipants);
   };
 
+  const deleteParticipant = async (index) => {
+    if (window.confirm('Are you sure you want to delete this participant?')) {
+      setIsLoading(true);
+      try {
+        // Optimistically update the UI
+        const updatedParticipants = participants.filter((_, i) => i !== index);
+        setParticipants(updatedParticipants);
+        recalculateYesData(updatedParticipants);
+
+        // Ensure documentId is available
+        let currentDocumentId = documentId;
+        if (!currentDocumentId) {
+          const checkResponse = await fetch(`http://localhost:5000/yes4youth-initiative/${userId}`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+          });
+
+          if (!checkResponse.ok) {
+            throw new Error(`Failed to fetch document ID: HTTP ${checkResponse.status}`);
+          }
+
+          const { data } = await checkResponse.json();
+          if (data.length === 0) {
+            throw new Error('No YES initiative data found for this user');
+          }
+          currentDocumentId = data[0].id;
+          setDocumentId(currentDocumentId);
+        }
+
+        // Update backend
+        const response = await fetch(`http://localhost:5000/yes4youth-initiative/${currentDocumentId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, participants: updatedParticipants, yesData }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(`Failed to update participant data: ${errorData.error || 'Unknown error'}`);
+        }
+
+        console.log('Participant deleted successfully');
+      } catch (error) {
+        console.error('Error deleting participant:', error);
+        alert(`Failed to delete participant: ${error.message}`);
+        // Re-fetch to restore state
+        try {
+          const response = await fetch(`http://localhost:5000/yes4youth-initiative/${userId}`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+          });
+          if (response.ok) {
+            const { data } = await response.json();
+            if (data.length > 0) {
+              setParticipants(data[0].participants || []);
+              setYesData(data[0].yesData || {
+                totalParticipants: 0,
+                blackYouthParticipants: 0,
+                totalStipendPaid: 0,
+                currentYesEmployees: 0,
+                completedYesAbsorbed: 0,
+              });
+              setDocumentId(data[0].id);
+            } else {
+              setParticipants([]);
+              setYesData({
+                totalParticipants: 0,
+                blackYouthParticipants: 0,
+                totalStipendPaid: 0,
+                currentYesEmployees: 0,
+                completedYesAbsorbed: 0,
+              });
+              setDocumentId(null);
+            }
+          }
+        } catch (fetchError) {
+          console.error('Error re-fetching data:', fetchError);
+          alert('Failed to restore data. Please refresh the page.');
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  const deleteYesInitiative = async () => {
+    if (window.confirm('Are you sure you want to delete all YES initiative data for this user?')) {
+      setIsLoading(true);
+      try {
+        const response = await fetch(`http://localhost:5000/yes4youth-initiative/${userId}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(`Failed to delete YES initiative data: ${errorData.error || 'Unknown error'}`);
+        }
+
+        console.log('YES initiative data deleted');
+        setParticipants([]);
+        setYesData({
+          totalParticipants: 0,
+          blackYouthParticipants: 0,
+          totalStipendPaid: 0,
+          currentYesEmployees: 0,
+          completedYesAbsorbed: 0,
+        });
+        setDocumentId(null);
+      } catch (error) {
+        console.error('Error deleting YES initiative data:', error);
+        alert(`Failed to delete: ${error.message}`);
+        // Re-fetch to restore state
+        try {
+          const response = await fetch(`http://localhost:5000/yes4youth-initiative/${userId}`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+          });
+          if (response.ok) {
+            const { data } = await response.json();
+            if (data.length > 0) {
+              setParticipants(data[0].participants || []);
+              setYesData(data[0].yesData || {
+                totalParticipants: 0,
+                blackYouthParticipants: 0,
+                totalStipendPaid: 0,
+                currentYesEmployees: 0,
+                completedYesAbsorbed: 0,
+              });
+              setDocumentId(data[0].id);
+            } else {
+              setParticipants([]);
+              setYesData({
+                totalParticipants: 0,
+                blackYouthParticipants: 0,
+                totalStipendPaid: 0,
+                currentYesEmployees: 0,
+                completedYesAbsorbed: 0,
+              });
+              setDocumentId(null);
+            }
+          }
+        } catch (fetchError) {
+          console.error('Error re-fetching data:', fetchError);
+          alert('Failed to restore data. Please refresh the page.');
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
 
   const resetNewParticipant = () => {
     setNewParticipant({
@@ -129,7 +364,7 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
       if (participant.race.toLowerCase() === 'black') {
         blackYouthParticipants += 1;
       }
-      totalStipendPaid += Number(participant.monthlyStipend);
+      totalStipendPaid += Number(participant.monthlyStipend) || 0;
       if (participant.isCurrentYesEmployee) {
         currentYesEmployees += 1;
       }
@@ -149,15 +384,15 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Submitting data:', { userId, participants, yesData });
+    console.log('Submitting YES initiative data:', { userId, participants, yesData, documentId });
 
     if (!userId) {
       alert('User ID is missing. Please ensure you are logged in.');
       return;
     }
 
+    setIsLoading(true);
     try {
-      // Check if data exists to determine POST or PUT
       const checkResponse = await fetch(`http://localhost:5000/yes4youth-initiative/${userId}`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
@@ -169,6 +404,7 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
 
       if (checkResponse.ok) {
         const { data } = await checkResponse.json();
+        console.log('Check response data:', data);
         if (data.length > 0) {
           method = 'PUT';
           existingId = data[0].id;
@@ -183,44 +419,25 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch {
+          errorData = { error: `Server error (HTTP ${response.status})` };
+        }
         throw new Error(`Failed to save YES initiative data: ${errorData.error || 'Unknown error'}`);
       }
 
       const result = await response.json();
       console.log('YES initiative data saved:', result);
+      setDocumentId(result.id);
       onSubmit({ participants, yesData });
       onClose();
     } catch (error) {
       console.error('Error saving YES initiative data:', error);
       alert(`Failed to save YES initiative data: ${error.message}`);
-    }
-  };
-
-  const deleteYesInitiative = async () => {
-    try {
-      const response = await fetch(`http://localhost:5000/yes4youth-initiative/${userId}`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`Failed to delete YES initiative data: ${errorData.error}`);
-      }
-
-      console.log('YES initiative data deleted');
-      setParticipants([]);
-      setYesData({
-        totalParticipants: 0,
-        blackYouthParticipants: 0,
-        totalStipendPaid: 0,
-        currentYesEmployees: 0,
-        completedYesAbsorbed: 0,
-      });
-    } catch (error) {
-      console.error('Error deleting YES initiative data:', error);
-      alert(`Failed to delete: ${error.message}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -243,6 +460,7 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
                   onChange={handleParticipantChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter name & surname"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -254,6 +472,7 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
                   onChange={handleParticipantChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter site/location"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -265,6 +484,7 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
                   onChange={handleParticipantChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter ID number"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -276,6 +496,7 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
                   onChange={handleParticipantChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter job title"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -285,6 +506,7 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
                   value={newParticipant.race}
                   onChange={handleParticipantChange}
                   className="w-full p-2 border rounded"
+                  disabled={isLoading}
                 >
                   <option value="">Select Race</option>
                   <option value="Black">Black</option>
@@ -301,6 +523,7 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
                   value={newParticipant.gender}
                   onChange={handleParticipantChange}
                   className="w-full p-2 border rounded"
+                  disabled={isLoading}
                 >
                   <option value="">Select Gender</option>
                   <option value="Male">Male</option>
@@ -315,6 +538,7 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
                   value={newParticipant.occupationalLevel}
                   onChange={handleParticipantChange}
                   className="w-full p-2 border rounded"
+                  disabled={isLoading}
                 >
                   <option value="">Select Occupational Level</option>
                   {occupationalLevels.map((level) => (
@@ -333,6 +557,7 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
                   onChange={handleParticipantChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter host employer/year"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -345,6 +570,7 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
                   min="0"
                   className="w-full p-2 border rounded"
                   placeholder="Enter monthly stipend"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -355,6 +581,7 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
                   value={newParticipant.startDate}
                   onChange={handleParticipantChange}
                   className="w-full p-2 border rounded"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -365,6 +592,7 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
                   value={newParticipant.endDate}
                   onChange={handleParticipantChange}
                   className="w-full p-2 border rounded"
+                  disabled={isLoading}
                 />
               </div>
               <div className="flex items-center">
@@ -374,6 +602,7 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
                   checked={newParticipant.isCurrentYesEmployee}
                   onChange={handleParticipantChange}
                   className="mr-2"
+                  disabled={isLoading}
                 />
                 <label className="text-sm font-medium">Current YES Employee</label>
               </div>
@@ -384,6 +613,7 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
                   checked={newParticipant.isCompletedYesAbsorbed}
                   onChange={handleParticipantChange}
                   className="mr-2"
+                  disabled={isLoading}
                 />
                 <label className="text-sm font-medium">Completed YES Absorbed</label>
               </div>
@@ -391,7 +621,8 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
             <button
               type="button"
               onClick={editingParticipantIndex !== null ? saveEditedParticipant : addParticipant}
-              className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+              className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:bg-blue-300"
+              disabled={isLoading}
             >
               {editingParticipantIndex !== null ? 'Save Edited Participant' : 'Add Participant'}
             </button>
@@ -423,15 +654,15 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
                   </thead>
                   <tbody>
                     {participants.map((participant, index) => (
-                      <tr key={index}>
+                      <tr key={participant.idNumber}>
                         <td className="border border-gray-300 px-4 py-2">{participant.name}</td>
-                        <td className="border border-gray-300 px-4 py-2">{participant.siteLocation}</td>
+                        <td className="border border-gray-300 px-4 py-2">{participant.siteLocation || 'N/A'}</td>
                         <td className="border border-gray-300 px-4 py-2">{participant.idNumber}</td>
                         <td className="border border-gray-300 px-4 py-2">{participant.jobTitle}</td>
                         <td className="border border-gray-300 px-4 py-2">{participant.race}</td>
                         <td className="border border-gray-300 px-4 py-2">{participant.gender}</td>
                         <td className="border border-gray-300 px-4 py-2">{participant.occupationalLevel}</td>
-                        <td className="border border-gray-300 px-4 py-2">{participant.hostEmployerYear}</td>
+                        <td className="border border-gray-300 px-4 py-2">{participant.hostEmployerYear || 'N/A'}</td>
                         <td className="border border-gray-300 px-4 py-2">{participant.monthlyStipend}</td>
                         <td className="border border-gray-300 px-4 py-2">{participant.startDate}</td>
                         <td className="border border-gray-300 px-4 py-2">{participant.endDate || 'N/A'}</td>
@@ -441,16 +672,18 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
                           <button
                             type="button"
                             onClick={() => editParticipant(index)}
-                            className="bg-yellow-500 text-white px-2 py-1 rounded mr-2 hover:bg-yellow-600"
+                            className="bg-yellow-500 text-white px-2 py-1 rounded mr-2 hover:bg-yellow-600 disabled:bg-yellow-300"
+                            disabled={isLoading}
                           >
                             Edit
                           </button>
                           <button
                             type="button"
-                            onClick={deleteYesInitiative}
-                            className="bg-red-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-red-700 w-full sm:w-auto transition-all duration-200"
+                            onClick={() => deleteParticipant(index)}
+                            className="bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700 disabled:bg-red-300"
+                            disabled={isLoading}
                           >
-                            Delete YES Initiative Details
+                            Delete
                           </button>
                         </td>
                       </tr>
@@ -513,17 +746,27 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
             </div>
           </div>
 
-          <div className="fixed bottom-4 sm:bottom-18 right-2 sm:right-4 md:right-78 flex flex-col sm:flex-row justify-end gap-2 sm:gap-4 bg-white p-3 sm:p-4 rounded-md shadow-lg w-[90%] sm:w-auto max-w-md">
+          <div className="fixed bottom-4 sm:bottom-12 right-2 sm:right-4 md:right-78 flex flex-col sm:flex-row justify-end gap-2 sm:gap-4 bg-white p-3 sm:p-4 rounded-md shadow-lg w-[90%] sm:w-auto max-w-md">
             <button
               type="button"
               onClick={onClose}
-              className="bg-gray-200 text-gray-800 px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-gray-300 w-full sm:w-auto transition-all duration-200"
+              className="bg-gray-200 text-gray-800 px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-gray-300 w-full sm:w-auto transition-all duration-200 disabled:bg-gray-100"
+              disabled={isLoading}
             >
               Cancel
             </button>
             <button
+              type="button"
+              onClick={deleteYesInitiative}
+              className="bg-red-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-red-700 w-full sm:w-auto transition-all duration-200 disabled:bg-red-300"
+              disabled={isLoading}
+            >
+              Delete All Data
+            </button>
+            <button
               type="submit"
-              className="bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-blue-700 w-full sm:w-auto transition-all duration-200"
+              className="bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-blue-700 w-full sm:w-auto transition-all duration-200 disabled:bg-blue-300"
+              disabled={isLoading}
             >
               Save YES Initiative Details
             </button>

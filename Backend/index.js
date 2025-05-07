@@ -1051,7 +1051,7 @@ app.delete('/employment-equity/:userId', async (req, res) => {
   }
 });
 
-// Yes 4 Youth Initiative - Create
+// Yes 4 Youth Initiative - Create (unchanged)
 app.post('/yes4youth-initiative', async (req, res) => {
   console.log('Yes 4 Youth Initiative POST hit with body:', req.body);
   const { userId, participants, yesData } = req.body;
@@ -1128,7 +1128,7 @@ app.post('/yes4youth-initiative', async (req, res) => {
   }
 });
 
-// Yes 4 Youth Initiative - Retrieve
+// Yes 4 Youth Initiative - Retrieve (updated)
 app.get('/yes4youth-initiative/:userId', async (req, res) => {
   console.log('Yes 4 Youth Initiative GET hit with userId:', req.params.userId);
   const { userId } = req.params;
@@ -1161,7 +1161,7 @@ app.get('/yes4youth-initiative/:userId', async (req, res) => {
   }
 });
 
-// Yes 4 Youth Initiative - Update
+// Yes 4 Youth Initiative - Update (unchanged)
 app.put('/yes4youth-initiative/:id', async (req, res) => {
   console.log('Yes 4 Youth Initiative PUT hit with body:', req.body);
   const { id } = req.params;
@@ -1173,7 +1173,7 @@ app.put('/yes4youth-initiative/:id', async (req, res) => {
       return res.status(400).json({ error: 'User ID is required' });
     }
     if (!participants || !Array.isArray(participants)) {
-      console.log('Validation failed: Participants is not an array or missing', { participants });
+      console.log('Validation failed: Participants is not muodified an array or missing', { participants });
       return res.status(400).json({ error: 'Participants must be an array' });
     }
     if (!yesData || typeof yesData !== 'object') {
@@ -1181,7 +1181,7 @@ app.put('/yes4youth-initiative/:id', async (req, res) => {
       return res.status(400).json({ error: 'YES data must be an object' });
     }
 
-    const userDoc = await adminDb.collection('users').doc(userId).get();
+    const userDoc = await adminDb.collection('clients').doc(userId).get();
     if (!userDoc.exists) {
       console.log('User not found for userId:', userId);
       return res.status(404).json({ error: 'User not found' });
@@ -1243,7 +1243,7 @@ app.put('/yes4youth-initiative/:id', async (req, res) => {
   }
 });
 
-// Yes 4 Youth Initiative - Delete
+// Yes 4 Youth Initiative - Delete (unchanged)
 app.delete('/yes4youth-initiative/:userId', async (req, res) => {
   console.log('Yes 4 Youth Initiative DELETE hit with userId:', req.params.userId);
   const { userId } = req.params;
@@ -1254,7 +1254,7 @@ app.delete('/yes4youth-initiative/:userId', async (req, res) => {
       return res.status(400).json({ error: 'User ID is required' });
     }
 
-    const userDoc = await adminDb.collection('users').doc(userId).get();
+    const userDoc = await adminDb.collection('clients').doc(userId).get();
     if (!userDoc.exists) {
       console.log('User not found for userId:', userId);
       return res.status(404).json({ error: 'User not found' });
@@ -1282,7 +1282,6 @@ app.delete('/yes4youth-initiative/:userId', async (req, res) => {
     res.status(500).json({ error: 'Failed to delete YES 4 Youth Initiative data', details: error.message });
   }
 });
-
 // Skills Development - Create
 app.post('/skills-development', async (req, res) => {
   console.log('Skills Development POST hit with body:', req.body);
