@@ -1839,7 +1839,8 @@ app.delete("/ownership-details/:userId", async (req, res) => {
   }
 });
 
-// Enterprise Development - Create (unchanged)
+
+// Enterprise Development - Create
 app.post("/enterprise-development", async (req, res) => {
   console.log("Enterprise Development POST hit with body:", req.body);
   const { userId, beneficiaries, summary } = req.body;
@@ -1858,8 +1859,9 @@ app.post("/enterprise-development", async (req, res) => {
       return res.status(400).json({ error: "Summary must be an object" });
     }
 
-    const userDoc = await getDoc(doc(db, "clients", userId));
-    if (!userDoc.exists()) {
+    console.log("Checking clients collection for userId:", userId);
+    const userDoc = await adminDb.collection("clients").doc(userId).get();
+    if (!userDoc.exists) {
       console.log("User not found for userId:", userId);
       return res.status(404).json({ error: "User not found" });
     }
@@ -1890,7 +1892,8 @@ app.post("/enterprise-development", async (req, res) => {
       updatedAt: new Date().toISOString(),
     };
 
-    const docRef = await addDoc(collection(db, "enterpriseDevelopment"), enterpriseDevelopmentData);
+    const docRef = await adminDb.collection("enterpriseDevelopment").add(enterpriseDevelopmentData);
+    console.log("Write successful, doc ID:", docRef.id);
 
     res.status(201).json({
       message: "Enterprise development data saved successfully",
@@ -1898,39 +1901,165 @@ app.post("/enterprise-development", async (req, res) => {
       ...enterpriseDevelopmentData,
     });
   } catch (error) {
-    console.error("Detailed error:", error);
+    console.error("Detailed error:", error.message, error.stack);
     res.status(400).json({ error: error.message, code: error.code });
   }
 });
 
-// Enterprise Development - Retrieve (unchanged)
+// Enterprise Development - Retrieve
 app.get("/enterprise-development/:userId", async (req, res) => {
+  console.log("Enterprise Development GET hit with userId:", req.params.userId);
   const { userId } = req.params;
 
   try {
-    const enterpriseRef = collection(db, "enterpriseDevelopment");
-    const q = query(enterpriseRef, where("userId", "==", userId));
-    const querySnapshot = await getDocs(q);
-
-    const enterpriseRecords = [];
-    querySnapshot.forEach((doc) => {
-      enterpriseRecords.push({
-        id: doc.id,
-        ...doc.data(),
-      });
-    });
-
-    if (enterpriseRecords.length === 0) {
-      return res.status(404).json({ message: "No enterprise development data found for this user" });
+    if (!userId) {
+      console.log("Missing userId in GET request");
+      return res.status(400).json({ error: "User ID is required" });
     }
+
+    console.log("Checking clients collection for userId:", userId);
+    const userDoc = await adminDb.collection("clients").doc(userId).get();
+    if (!userDoc.exists) {
+      console.log("User not found for userId:", userId);
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const querySnapshot = await adminDb.collection("enterpriseDevelopment").where("userId", "==", userId).get();
+    const enterpriseRecords = querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
 
     res.status(200).json({
       message: "Enterprise development data retrieved successfully",
       data: enterpriseRecords,
     });
   } catch (error) {
-    console.error("Enterprise development retrieval error:", error.code, error.message);
-    res.status(500).json({ error: error.message, code: error.code });
+    console.error("Enterprise development retrieval error:", error.message, error.stack);
+    res.status(500).json({ error: "Failed to retrieve enterprise development data", code: error.code });
+  }
+});
+
+// Enterprise Development - Update
+app.put("/enterprise-development/:id", async (req, res) => {
+  console.log("Enterprise Development PUT hit with body:", req.body);
+  const { id } = req.params;
+  const { userId, beneficiaries, summary } = req.body;
+
+  try {
+    if (!userId) {
+      console.log("Validation failed: Missing userId");
+      return res.status(400).json({ error: "User ID is required" });
+    }
+    if (!beneficiaries || !Array.isArray(beneficiaries)) {
+      console.log("Validation failed: Beneficiaries is not an array or missing", { beneficiaries });
+      return res.status(400).json({ error: "Beneficiaries must be an array" });
+    }
+    if (!summary || typeof summary !== "object") {
+      console.log("Validation failed: Summary is not an object or missing", { summary });
+      return res.status(400).json({ error: "Summary must be an object" });
+    }
+
+    console.log("Checking clients collection for userId:", userId);
+    const userDoc = await adminDb.collection("clients").doc(userId).get();
+    if (!userDoc.exists) {
+      console.log("User not found for userId:", userId);
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const docRef = adminDb.collection("enterpriseDevelopment").doc(id);
+    const existingDoc = await docRef.get();
+    if (!existingDoc.exists) {
+      console.log("Enterprise development data not found for id:", id);
+      return res.status(404).json({ error: "Enterprise development data not found" });
+    }
+
+    const enterpriseDevelopmentData = {
+      userId,
+      beneficiaries: beneficiaries.map((beneficiary) => ({
+        beneficiaryName: beneficiary.beneficiaryName || "",
+        siteLocation: beneficiary.siteLocation || "",
+        isSupplierDevelopmentBeneficiary: Boolean(beneficiary.isSupplierDevelopmentBeneficiary),
+        blackOwnershipPercentage: Number(beneficiary.blackOwnershipPercentage) || 0,
+        blackWomenOwnershipPercentage: Number(beneficiary.blackWomenOwnershipPercentage) || 0,
+        beeStatusLevel: beneficiary.beeStatusLevel || "",
+        contributionType: beneficiary.contributionType || "",
+        contributionDescription: beneficiary.contributionDescription || "",
+        dateOfContribution: beneficiary.dateOfContribution || "",
+        paymentDate: beneficiary.paymentDate || "",
+        contributionAmount: Number(beneficiary.contributionAmount) || 0,
+      })),
+      summary: {
+        totalBeneficiaries: Number(summary.totalBeneficiaries) || 0,
+        totalContributionAmount: Number(summary.totalContributionAmount) || 0,
+        supplierDevelopmentBeneficiaries: Number(summary.supplierDevelopmentBeneficiaries) || 0,
+        blackOwnedBeneficiaries: Number(summary.blackOwnedBeneficiaries) || 0,
+        blackWomenOwnedBeneficiaries: Number(summary.blackWomenOwnedBeneficiaries) || 0,
+      },
+      updatedAt: new Date().toISOString(),
+    };
+
+    await docRef.update({
+      ...enterpriseDevelopmentData,
+      createdAt: existingDoc.data().createdAt,
+    });
+
+    console.log("Enterprise development data updated with ID:", id);
+    res.status(200).json({
+      message: "Enterprise development data updated successfully",
+      id,
+      ...enterpriseDevelopmentData,
+    });
+  } catch (error) {
+    console.error("Detailed error in PUT /enterprise-development:", {
+      message: error.message,
+      code: error.code,
+      stack: error.stack,
+      requestBody: req.body,
+    });
+    res.status(400).json({ error: error.message, code: error.code });
+  }
+});
+
+// Enterprise Development - Delete
+app.delete("/enterprise-development/:userId", async (req, res) => {
+  console.log("Enterprise Development DELETE hit with userId:", req.params.userId);
+  const { userId } = req.params;
+
+  try {
+    if (!userId) {
+      console.log("Missing userId in params");
+      return res.status(400).json({ error: "User ID is required" });
+    }
+
+    console.log("Checking clients collection for userId:", userId);
+    const userDoc = await adminDb.collection("clients").doc(userId).get();
+    if (!userDoc.exists) {
+      console.log("User not found for userId:", userId);
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const querySnapshot = await adminDb.collection("enterpriseDevelopment").where("userId", "==", userId).get();
+    if (querySnapshot.empty) {
+      console.log("No enterprise development data found for userId:", userId);
+      return res.status(404).json({ error: "No enterprise development data found for this user" });
+    }
+
+    const deletePromises = [];
+    querySnapshot.docs.forEach((doc) => {
+      deletePromises.push(doc.ref.delete());
+    });
+
+    await Promise.all(deletePromises);
+
+    console.log("Enterprise development data deleted for userId:", userId);
+    res.status(200).json({
+      message: "Enterprise development data deleted successfully",
+      userId,
+    });
+  } catch (error) {
+    console.error("Detailed error in DELETE /enterprise-development:", error.message, error.stack);
+    res.status(500).json({ error: "Failed to delete enterprise development data", code: error.code });
   }
 });
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
+import PropTypes from "prop-types";
 
-const EnterpriseDevelopment = ({ userId, onClose, onSubmit }) => {
+const EnterpriseDevelopment = ({ userId, onClose, onSubmit, onLogout }) => {
   const [beneficiaries, setBeneficiaries] = useState([]);
   const [newBeneficiary, setNewBeneficiary] = useState({
     beneficiaryName: "",
@@ -15,8 +16,7 @@ const EnterpriseDevelopment = ({ userId, onClose, onSubmit }) => {
     paymentDate: "",
     contributionAmount: 0,
   });
-  const [editingBeneficiaryIndex, setEditingBeneficiaryIndex] = useState(null); // New state for editing
-
+  const [editingBeneficiaryIndex, setEditingBeneficiaryIndex] = useState(null);
   const [summary, setSummary] = useState({
     totalBeneficiaries: 0,
     totalContributionAmount: 0,
@@ -24,24 +24,87 @@ const EnterpriseDevelopment = ({ userId, onClose, onSubmit }) => {
     blackOwnedBeneficiaries: 0,
     blackWomenOwnedBeneficiaries: 0,
   });
+  const [isLoading, setIsLoading] = useState(false);
+  const [documentId, setDocumentId] = useState(null);
 
   // Fetch existing data when component mounts
   useEffect(() => {
+    console.log("EnterpriseDevelopment mounted with userId:", userId);
+    if (!userId) {
+      console.warn("EnterpriseDevelopment: userId prop is missing or undefined");
+      return;
+    }
+
     const fetchEnterpriseData = async () => {
+      setIsLoading(true);
       try {
+        console.log("Fetching enterprise development data for userId:", userId);
         const response = await fetch(`http://localhost:5000/enterprise-development/${userId}`);
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+        if (!response.ok) {
+          const errorData = await response.json();
+          if (response.status === 404 && errorData.message === "No enterprise development data found for this user") {
+            console.log("No enterprise development data found for userId:", userId);
+            setBeneficiaries([]);
+            setSummary({
+              totalBeneficiaries: 0,
+              totalContributionAmount: 0,
+              supplierDevelopmentBeneficiaries: 0,
+              blackOwnedBeneficiaries: 0,
+              blackWomenOwnedBeneficiaries: 0,
+            });
+            setDocumentId(null);
+            return;
+          }
+          throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
+        }
         const { data } = await response.json();
         if (data.length > 0) {
-          setBeneficiaries(data[0].beneficiaries);
-          setSummary(data[0].summary);
+          setBeneficiaries(data[0].beneficiaries || []);
+          setSummary(data[0].summary || {
+            totalBeneficiaries: 0,
+            totalContributionAmount: 0,
+            supplierDevelopmentBeneficiaries: 0,
+            blackOwnedBeneficiaries: 0,
+            blackWomenOwnedBeneficiaries: 0,
+          });
+          setDocumentId(data[0].id);
+          console.log("Set documentId:", data[0].id);
+        } else {
+          console.log("No enterprise development data found for userId:", userId);
+          setBeneficiaries([]);
+          setSummary({
+            totalBeneficiaries: 0,
+            totalContributionAmount: 0,
+            supplierDevelopmentBeneficiaries: 0,
+            blackOwnedBeneficiaries: 0,
+            blackWomenOwnedBeneficiaries: 0,
+          });
+          setDocumentId(null);
         }
       } catch (error) {
-        console.error("Error fetching enterprise development data:", error);
+        console.warn("Error fetching enterprise development data:", error.message);
+        if (error.message.includes("User not found")) {
+          alert("Your account is not set up. Please log in again.");
+          onLogout();
+          return;
+        }
+        alert(`Failed to fetch enterprise development data: ${error.message}`);
+        setBeneficiaries([]);
+        setSummary({
+          totalBeneficiaries: 0,
+          totalContributionAmount: 0,
+          supplierDevelopmentBeneficiaries: 0,
+          blackOwnedBeneficiaries: 0,
+          blackWomenOwnedBeneficiaries: 0,
+        });
+        setDocumentId(null);
+      } finally {
+        setIsLoading(false);
       }
     };
-    if (userId) fetchEnterpriseData();
-  }, [userId]);
+
+    fetchEnterpriseData();
+  }, [userId, onLogout]);
 
   const handleBeneficiaryChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -59,12 +122,18 @@ const EnterpriseDevelopment = ({ userId, onClose, onSubmit }) => {
   };
 
   const addBeneficiary = () => {
+    if (!userId) {
+      console.warn("addBeneficiary: userId is missing");
+      return;
+    }
     if (
-      !newBeneficiary.beneficiaryName ||
-      !newBeneficiary.contributionAmount ||
-      !newBeneficiary.contributionType
+      !newBeneficiary.beneficiaryName.trim() ||
+      newBeneficiary.contributionAmount <= 0 ||
+      !newBeneficiary.contributionType.trim()
     ) {
-      alert("Please fill in the Beneficiary Name, Contribution Amount, and Contribution Type.");
+      alert(
+        "Please fill in the Beneficiary Name, Contribution Amount (greater than 0), and Contribution Type."
+      );
       return;
     }
 
@@ -80,12 +149,18 @@ const EnterpriseDevelopment = ({ userId, onClose, onSubmit }) => {
   };
 
   const saveEditedBeneficiary = () => {
+    if (!userId) {
+      console.warn("saveEditedBeneficiary: userId is missing");
+      return;
+    }
     if (
-      !newBeneficiary.beneficiaryName ||
-      !newBeneficiary.contributionAmount ||
-      !newBeneficiary.contributionType
+      !newBeneficiary.beneficiaryName.trim() ||
+      newBeneficiary.contributionAmount <= 0 ||
+      !newBeneficiary.contributionType.trim()
     ) {
-      alert("Please fill in the Beneficiary Name, Contribution Amount, and Contribution Type.");
+      alert(
+        "Please fill in the Beneficiary Name, Contribution Amount (greater than 0), and Contribution Type."
+      );
       return;
     }
 
@@ -98,10 +173,90 @@ const EnterpriseDevelopment = ({ userId, onClose, onSubmit }) => {
     recalculateSummary(updatedBeneficiaries);
   };
 
-  const deleteBeneficiary = (index) => {
-    const updatedBeneficiaries = beneficiaries.filter((_, i) => i !== index);
-    setBeneficiaries(updatedBeneficiaries);
-    recalculateSummary(updatedBeneficiaries);
+  const deleteBeneficiary = async (index) => {
+    if (!userId) {
+      console.warn("deleteBeneficiary: userId is missing");
+      return;
+    }
+    if (window.confirm("Are you sure you want to delete this beneficiary?")) {
+      setIsLoading(true);
+      try {
+        const updatedBeneficiaries = beneficiaries.filter((_, i) => i !== index);
+        setBeneficiaries(updatedBeneficiaries);
+        recalculateSummary(updatedBeneficiaries);
+
+        let currentDocumentId = documentId;
+        if (!currentDocumentId) {
+          const checkResponse = await fetch(`http://localhost:5000/enterprise-development/${userId}`);
+          if (!checkResponse.ok) {
+            const errorData = await checkResponse.json();
+            throw new Error(errorData.error || "No enterprise development data found for this user");
+          }
+          const { data } = await checkResponse.json();
+          if (data.length === 0) {
+            throw new Error("No enterprise development data found for this user");
+          }
+          currentDocumentId = data[0].id;
+          setDocumentId(currentDocumentId);
+        }
+
+        const response = await fetch(`http://localhost:5000/enterprise-development/${currentDocumentId}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userId,
+            beneficiaries: updatedBeneficiaries,
+            summary,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
+        }
+
+        console.log("Beneficiary deleted successfully:", await response.json());
+      } catch (error) {
+        console.error("Error deleting beneficiary:", error);
+        alert(`Failed to delete beneficiary: ${error.message}`);
+        try {
+          const response = await fetch(`http://localhost:5000/enterprise-development/${userId}`);
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
+          }
+          const { data } = await response.json();
+          if (data.length > 0) {
+            setBeneficiaries(data[0].beneficiaries || []);
+            setSummary(data[0].summary || {
+              totalBeneficiaries: 0,
+              totalContributionAmount: 0,
+              supplierDevelopmentBeneficiaries: 0,
+              blackOwnedBeneficiaries: 0,
+              blackWomenOwnedBeneficiaries: 0,
+            });
+            setDocumentId(data[0].id);
+          } else {
+            setBeneficiaries([]);
+            setSummary({
+              totalBeneficiaries: 0,
+              totalContributionAmount: 0,
+              supplierDevelopmentBeneficiaries: 0,
+              blackOwnedBeneficiaries: 0,
+              blackWomenOwnedBeneficiaries: 0,
+            });
+            setDocumentId(null);
+          }
+        } catch (fetchError) {
+          console.error("Error re-fetching data:", fetchError);
+          alert("Failed to restore data. Please refresh the page.");
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    }
   };
 
   const resetNewBeneficiary = () => {
@@ -121,49 +276,187 @@ const EnterpriseDevelopment = ({ userId, onClose, onSubmit }) => {
   };
 
   const recalculateSummary = (updatedBeneficiaries) => {
-    let totalBeneficiaries = updatedBeneficiaries.length;
-    let totalContributionAmount = 0;
-    let supplierDevelopmentBeneficiaries = 0;
-    let blackOwnedBeneficiaries = 0;
-    let blackWomenOwnedBeneficiaries = 0;
-
-    updatedBeneficiaries.forEach((beneficiary) => {
-      totalContributionAmount += Number(beneficiary.contributionAmount);
-      if (beneficiary.isSupplierDevelopmentBeneficiary) supplierDevelopmentBeneficiaries += 1;
-      if (Number(beneficiary.blackOwnershipPercentage) >= 30) blackOwnedBeneficiaries += 1;
-      if (Number(beneficiary.blackWomenOwnershipPercentage) >= 30) blackWomenOwnedBeneficiaries += 1;
-    });
-
-    setSummary({
-      totalBeneficiaries,
-      totalContributionAmount,
-      supplierDevelopmentBeneficiaries,
-      blackOwnedBeneficiaries,
-      blackWomenOwnedBeneficiaries,
-    });
+    const summary = updatedBeneficiaries.reduce(
+      (acc, beneficiary) => ({
+        totalBeneficiaries: acc.totalBeneficiaries + 1,
+        totalContributionAmount: acc.totalContributionAmount + Number(beneficiary.contributionAmount || 0),
+        supplierDevelopmentBeneficiaries:
+          acc.supplierDevelopmentBeneficiaries + (beneficiary.isSupplierDevelopmentBeneficiary ? 1 : 0),
+        blackOwnedBeneficiaries:
+          acc.blackOwnedBeneficiaries + (Number(beneficiary.blackOwnershipPercentage) >= 30 ? 1 : 0),
+        blackWomenOwnedBeneficiaries:
+          acc.blackWomenOwnedBeneficiaries +
+          (Number(beneficiary.blackWomenOwnershipPercentage) >= 30 ? 1 : 0),
+      }),
+      {
+        totalBeneficiaries: 0,
+        totalContributionAmount: 0,
+        supplierDevelopmentBeneficiaries: 0,
+        blackOwnedBeneficiaries: 0,
+        blackWomenOwnedBeneficiaries: 0,
+      }
+    );
+    setSummary(summary);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log("Submitting enterprise development data:", { userId, beneficiaries, summary });
+    if (!userId) {
+      console.warn("handleSubmit: userId is missing");
+      alert("User ID is missing. Please log in again.");
+      return;
+    }
+
+    if (beneficiaries.length === 0) {
+      alert("Please add at least one beneficiary before submitting.");
+      return;
+    }
+
+    setIsLoading(true);
     try {
-      const payload = { userId, beneficiaries, summary };
-      const response = await fetch("http://localhost:5000/enterprise-development", {
-        method: "POST",
+      let method = "POST";
+      let url = "http://localhost:5000/enterprise-development";
+      let existingId = null;
+
+      try {
+        const checkResponse = await fetch(`http://localhost:5000/enterprise-development/${userId}`);
+        if (!checkResponse.ok) {
+          const errorData = await checkResponse.json();
+          if (errorData.error === "User not found") {
+            alert("Your account is not set up. Please log in again.");
+            onLogout();
+            return;
+          }
+          throw new Error(errorData.error || `HTTP error! Status: ${checkResponse.status}`);
+        }
+        const { data } = await checkResponse.json();
+        if (data.length > 0) {
+          method = "PUT";
+          existingId = data[0].id;
+          url = `http://localhost:5000/enterprise-development/${existingId}`;
+        }
+      } catch (checkError) {
+        if (checkError.message.includes("No enterprise development data found")) {
+          console.warn("No existing enterprise development data found for userId:", userId);
+        } else {
+          throw checkError;
+        }
+      }
+
+      const response = await fetch(url, {
+        method,
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ userId, beneficiaries, summary }),
       });
-      if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
+      }
+
       const data = await response.json();
       console.log("Enterprise development data saved:", data);
-      onSubmit(payload);
+      setDocumentId(data.id);
+      onSubmit({ beneficiaries, summary });
       onClose();
     } catch (error) {
       console.error("Error saving enterprise development data:", error);
       alert(`Failed to save enterprise development data: ${error.message}`);
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  const deleteEnterpriseDevelopment = async () => {
+    if (!userId) {
+      console.warn("deleteEnterpriseDevelopment: userId is missing");
+      return;
+    }
+    if (window.confirm("Are you sure you want to delete all enterprise development data for this user?")) {
+      setIsLoading(true);
+      try {
+        const response = await fetch(`http://localhost:5000/enterprise-development/${userId}`, {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
+        }
+
+        console.log("Enterprise development data deleted:", await response.json());
+        setBeneficiaries([]);
+        setSummary({
+          totalBeneficiaries: 0,
+          totalContributionAmount: 0,
+          supplierDevelopmentBeneficiaries: 0,
+          blackOwnedBeneficiaries: 0,
+          blackWomenOwnedBeneficiaries: 0,
+        });
+        setDocumentId(null);
+      } catch (error) {
+        console.error("Error deleting enterprise development data:", error);
+        alert(`Failed to delete: ${error.message}`);
+        try {
+          const response = await fetch(`http://localhost:5000/enterprise-development/${userId}`);
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
+          }
+          const { data } = await response.json();
+          if (data.length > 0) {
+            setBeneficiaries(data[0].beneficiaries || []);
+            setSummary(data[0].summary || {
+              totalBeneficiaries: 0,
+              totalContributionAmount: 0,
+              supplierDevelopmentBeneficiaries: 0,
+              blackOwnedBeneficiaries: 0,
+              blackWomenOwnedBeneficiaries: 0,
+            });
+            setDocumentId(data[0].id);
+          } else {
+            setBeneficiaries([]);
+            setSummary({
+              totalBeneficiaries: 0,
+              totalContributionAmount: 0,
+              supplierDevelopmentBeneficiaries: 0,
+              blackOwnedBeneficiaries: 0,
+              blackWomenOwnedBeneficiaries: 0,
+            });
+            setDocumentId(null);
+          }
+        } catch (fetchError) {
+          console.error("Error re-fetching data:", fetchError);
+          alert("Failed to restore data. Please refresh the page.");
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  if (!userId) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg shadow-md p-6 w-full max-w-md">
+          <h2 className="text-xl font-semibold mb-4">Error</h2>
+          <p className="text-red-600 mb-4">User ID is missing. Please ensure you are logged in and try again.</p>
+          <button
+            onClick={onClose}
+            className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -184,6 +477,7 @@ const EnterpriseDevelopment = ({ userId, onClose, onSubmit }) => {
                   onChange={handleBeneficiaryChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter beneficiary name"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -195,6 +489,7 @@ const EnterpriseDevelopment = ({ userId, onClose, onSubmit }) => {
                   onChange={handleBeneficiaryChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter site/location"
+                  disabled={isLoading}
                 />
               </div>
               <div className="flex items-center">
@@ -204,6 +499,7 @@ const EnterpriseDevelopment = ({ userId, onClose, onSubmit }) => {
                   checked={newBeneficiary.isSupplierDevelopmentBeneficiary}
                   onChange={handleBeneficiaryChange}
                   className="mr-2"
+                  disabled={isLoading}
                 />
                 <label className="text-sm font-medium">Supplier Development Beneficiary</label>
               </div>
@@ -218,6 +514,7 @@ const EnterpriseDevelopment = ({ userId, onClose, onSubmit }) => {
                   placeholder="Enter percentage"
                   min="0"
                   max="100"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -231,6 +528,7 @@ const EnterpriseDevelopment = ({ userId, onClose, onSubmit }) => {
                   placeholder="Enter percentage"
                   min="0"
                   max="100"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -240,6 +538,7 @@ const EnterpriseDevelopment = ({ userId, onClose, onSubmit }) => {
                   value={newBeneficiary.beeStatusLevel}
                   onChange={handleBeneficiaryChange}
                   className="w-full p-2 border rounded"
+                  disabled={isLoading}
                 >
                   <option value="">Select BEE Level</option>
                   {[...Array(8).keys()].map((level) => (
@@ -257,6 +556,7 @@ const EnterpriseDevelopment = ({ userId, onClose, onSubmit }) => {
                   value={newBeneficiary.contributionType}
                   onChange={handleBeneficiaryChange}
                   className="w-full p-2 border rounded"
+                  disabled={isLoading}
                 >
                   <option value="">Select Contribution Type</option>
                   <option value="Grant">Grant</option>
@@ -290,6 +590,7 @@ const EnterpriseDevelopment = ({ userId, onClose, onSubmit }) => {
                   onChange={handleBeneficiaryChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter description"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -300,6 +601,7 @@ const EnterpriseDevelopment = ({ userId, onClose, onSubmit }) => {
                   value={newBeneficiary.dateOfContribution}
                   onChange={handleBeneficiaryChange}
                   className="w-full p-2 border rounded"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -310,6 +612,7 @@ const EnterpriseDevelopment = ({ userId, onClose, onSubmit }) => {
                   value={newBeneficiary.paymentDate}
                   onChange={handleBeneficiaryChange}
                   className="w-full p-2 border rounded"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -321,13 +624,16 @@ const EnterpriseDevelopment = ({ userId, onClose, onSubmit }) => {
                   onChange={handleBeneficiaryChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter amount"
+                  min="0"
+                  disabled={isLoading}
                 />
               </div>
             </div>
             <button
               type="button"
               onClick={editingBeneficiaryIndex !== null ? saveEditedBeneficiary : addBeneficiary}
-              className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+              className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:bg-blue-300"
+              disabled={isLoading}
             >
               {editingBeneficiaryIndex !== null ? "Save Edited Beneficiary" : "Add Beneficiary"}
             </button>
@@ -366,7 +672,7 @@ const EnterpriseDevelopment = ({ userId, onClose, onSubmit }) => {
                         <td className="border border-gray-300 px-4 py-2">
                           {beneficiary.blackOwnershipPercentage}%
                         </td>
-                        <td className="border border-gray- RGBA px-4 py-2">
+                        <td className="border border-gray-300 px-4 py-2">
                           {beneficiary.blackWomenOwnershipPercentage}%
                         </td>
                         <td className="border border-gray-300 px-4 py-2">{beneficiary.beeStatusLevel || "N/A"}</td>
@@ -374,21 +680,25 @@ const EnterpriseDevelopment = ({ userId, onClose, onSubmit }) => {
                         <td className="border border-gray-300 px-4 py-2">
                           {beneficiary.contributionDescription || "N/A"}
                         </td>
-                        <td className="border border-gray-300 px-4 py-2">{beneficiary.dateOfContribution || "N/A"}</td>
+                        <td className="border border-gray-300 px-4 py-2">
+                          {beneficiary.dateOfContribution || "N/A"}
+                        </td>
                         <td className="border border-gray-300 px-4 py-2">{beneficiary.paymentDate || "N/A"}</td>
                         <td className="border border-gray-300 px-4 py-2">{beneficiary.contributionAmount}</td>
                         <td className="border border-gray-300 px-4 py-2">
                           <button
                             type="button"
                             onClick={() => editBeneficiary(index)}
-                            className="bg-yellow-500 text-white px-2 py-1 rounded mr-2 hover:bg-yellow-600"
+                            className="bg-yellow-500 text-white px-2 py-1 rounded mr-2 hover:bg-yellow-600 disabled:bg-yellow-300"
+                            disabled={isLoading}
                           >
                             Edit
                           </button>
                           <button
                             type="button"
                             onClick={() => deleteBeneficiary(index)}
-                            className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
+                            className="bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700 disabled:bg-red-300"
+                            disabled={isLoading}
                           >
                             Delete
                           </button>
@@ -410,7 +720,7 @@ const EnterpriseDevelopment = ({ userId, onClose, onSubmit }) => {
                 <input
                   type="number"
                   value={summary.totalBeneficiaries}
-                  className="w-full p-2 border rounded"
+                  className="w-full p-2 border rounded bg-gray-100"
                   disabled
                 />
               </div>
@@ -419,7 +729,7 @@ const EnterpriseDevelopment = ({ userId, onClose, onSubmit }) => {
                 <input
                   type="number"
                   value={summary.totalContributionAmount}
-                  className="w-full p-2 border rounded"
+                  className="w-full p-2 border rounded bg-gray-100"
                   disabled
                 />
               </div>
@@ -428,7 +738,7 @@ const EnterpriseDevelopment = ({ userId, onClose, onSubmit }) => {
                 <input
                   type="number"
                   value={summary.supplierDevelopmentBeneficiaries}
-                  className="w-full p-2 border rounded"
+                  className="w-full p-2 border rounded bg-gray-100"
                   disabled
                 />
               </div>
@@ -437,7 +747,7 @@ const EnterpriseDevelopment = ({ userId, onClose, onSubmit }) => {
                 <input
                   type="number"
                   value={summary.blackOwnedBeneficiaries}
-                  className="w-full p-2 border rounded"
+                  className="w-full p-2 border rounded bg-gray-100"
                   disabled
                 />
               </div>
@@ -446,24 +756,36 @@ const EnterpriseDevelopment = ({ userId, onClose, onSubmit }) => {
                 <input
                   type="number"
                   value={summary.blackWomenOwnedBeneficiaries}
-                  className="w-full p-2 border rounded"
+                  className="w-full p-2 border rounded bg-gray-100"
                   disabled
                 />
               </div>
             </div>
           </div>
 
-          <div className="flex justify-end gap-4">
+          <div className="fixed bottom-4 sm:bottom-12 right-2 sm:right-4 md:right-78 flex flex-col sm:flex-row justify-end gap-2 sm:gap-4 bg-white p-3 sm:p-4 rounded-md shadow-lg w-[90%] sm:w-auto max-w-md">
             <button
               type="button"
               onClick={onClose}
-              className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300"
+              className="bg-gray-200 text-gray-800 px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-gray-300 w-full sm:w-auto transition-all duration-200 disabled:bg-gray-100"
+              disabled={isLoading}
             >
               Cancel
             </button>
+            {beneficiaries.length > 0 && (
+              <button
+                type="button"
+                onClick={deleteEnterpriseDevelopment}
+                className="bg-red-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-red-700 w-full sm:w-auto transition-all duration-200 disabled:bg-red-300"
+                disabled={isLoading}
+              >
+                Delete Enterprise Development Details
+              </button>
+            )}
             <button
               type="submit"
-              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+              className="bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-blue-700 w-full sm:w-auto transition-all duration-200 disabled:bg-blue-300"
+              disabled={isLoading}
             >
               Save Enterprise Development Details
             </button>
@@ -472,6 +794,13 @@ const EnterpriseDevelopment = ({ userId, onClose, onSubmit }) => {
       </div>
     </div>
   );
+};
+
+EnterpriseDevelopment.propTypes = {
+  userId: PropTypes.string.isRequired,
+  onClose: PropTypes.func.isRequired,
+  onSubmit: PropTypes.func.isRequired,
+  onLogout: PropTypes.func.isRequired,
 };
 
 export default EnterpriseDevelopment;
