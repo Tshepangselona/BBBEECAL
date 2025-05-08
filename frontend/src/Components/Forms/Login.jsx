@@ -51,7 +51,9 @@ export default function Login() {
   return (
     <div className="max-w-md mx-auto mt-10 p-6 bg-white rounded-lg shadow-md">
             <div className="flex justify-center mb-6">
+              <Link to='/LandingPage'>
               <img src={logo} alt="Forge Logo" className="h-16" />
+              </Link>
             </div>
       <h2 className="text-2xl font-bold mb-6 text-center">Log In</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
