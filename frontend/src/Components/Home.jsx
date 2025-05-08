@@ -453,7 +453,19 @@ const Home = () => {
       bbeeLevel,
       bbeeStatus,
       scorecard,
+      companyName: financialData.companyName,
+      yearEnd: financialData.yearEnd,
+      turnover: financialData.turnover,
+      npat: financialData.npat,
+      totalLeviableAmount: financialData.totalLeviableAmount,
+      totalMeasuredProcurementSpend: financialData.totalMeasuredProcurementSpend,
+      assessmentType: assessmentStarted ? 'New' : 'Saved',
+      skillsDevelopmentExpenditure: skillsDevelopmentDetails?.summary?.totalDirectExpenditure || 0,
+      supplierDevelopmentSpend: supplierDevelopmentDetails?.localSummary?.totalExpenditure || 0,
+      enterpriseDevelopmentContribution: enterpriseDevelopmentDetails?.summary?.totalContribution || 0,
+      socioEconomicContribution: socioEconomicDevelopmentDetails?.summary?.totalContribution || 0,
     });
+    
 
     setShowResultsModal(true);
   };
