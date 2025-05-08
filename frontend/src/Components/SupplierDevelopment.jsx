@@ -1,6 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import PropTypes from 'prop-types';
 
-const SupplierDevelopment = ({ onClose, onSubmit }) => {
+const SupplierDevelopment = ({ userId, onClose, onSubmit, onLogout }) => {
+  console.log('SupplierDevelopment rendered with userId:', userId);
+
   const [localSuppliers, setLocalSuppliers] = useState([]);
   const [newLocalSupplier, setNewLocalSupplier] = useState({
     supplierName: '',
@@ -18,8 +22,7 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
     isESDRecipient: false,
     beeCertificateExpiryDate: '',
   });
-  const [editingSupplierIndex, setEditingSupplierIndex] = useState(null); // New state for editing local supplier
-
+  const [editingSupplierIndex, setEditingSupplierIndex] = useState(null);
   const [localSummary, setLocalSummary] = useState({
     totalSuppliers: 0,
     totalExpenditure: 0,
@@ -37,12 +40,107 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
     reasonForImport: '',
     esdPlan: '',
   });
-  const [editingImportIndex, setEditingImportIndex] = useState(null); // New state for editing import
-
+  const [editingImportIndex, setEditingImportIndex] = useState(null);
   const [importSummary, setImportSummary] = useState({
     totalImports: 0,
     totalExpenditure: 0,
   });
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [documentId, setDocumentId] = useState(null);
+
+  useEffect(() => {
+    console.log('SupplierDevelopment mounted with userId:', userId);
+    if (!userId) {
+      console.warn('SupplierDevelopment: userId prop is missing or undefined');
+      return;
+    }
+
+    const fetchSupplierData = async () => {
+      setIsLoading(true);
+      try {
+        console.log('Fetching supplier development data for userId:', userId);
+        const response = await axios.get(`http://localhost:5000/supplier-development/${userId}`);
+        const records = response.data.data;
+        if (records.length > 0) {
+          setLocalSuppliers(records[0].localSuppliers || []);
+          setImports(records[0].imports || []);
+          setLocalSummary(records[0].localSummary || {
+            totalSuppliers: 0,
+            totalExpenditure: 0,
+            blackOwnedSuppliers: 0,
+            blackWomanOwnedSuppliers: 0,
+            esdRecipients: 0,
+          });
+          setImportSummary(records[0].importSummary || {
+            totalImports: 0,
+            totalExpenditure: 0,
+          });
+          setDocumentId(records[0].id);
+          console.log('Set documentId:', records[0].id);
+        } else {
+          console.log('No supplier development data found for userId:', userId);
+          setLocalSuppliers([]);
+          setImports([]);
+          setLocalSummary({
+            totalSuppliers: 0,
+            totalExpenditure: 0,
+            blackOwnedSuppliers: 0,
+            blackWomanOwnedSuppliers: 0,
+            esdRecipients: 0,
+          });
+          setImportSummary({
+            totalImports: 0,
+            totalExpenditure: 0,
+          });
+          setDocumentId(null);
+        }
+      } catch (error) {
+        console.warn('Error fetching supplier development data:', error.response?.data?.error || error.message);
+        if (error.response?.status === 404) {
+          if (error.response.data.error === 'User not found') {
+            alert('Your account is not set up. Please log in again.');
+            onLogout();
+            return;
+          }
+          setLocalSuppliers([]);
+          setImports([]);
+          setLocalSummary({
+            totalSuppliers: 0,
+            totalExpenditure: 0,
+            blackOwnedSuppliers: 0,
+            blackWomanOwnedSuppliers: 0,
+            esdRecipients: 0,
+          });
+          setImportSummary({
+            totalImports: 0,
+            totalExpenditure: 0,
+          });
+          setDocumentId(null);
+        } else {
+          alert(`Failed to fetch supplier development data: ${error.response?.data?.error || error.message}`);
+          setLocalSuppliers([]);
+          setImports([]);
+          setLocalSummary({
+            totalSuppliers: 0,
+            totalExpenditure: 0,
+            blackOwnedSuppliers: 0,
+            blackWomanOwnedSuppliers: 0,
+            esdRecipients: 0,
+          });
+          setImportSummary({
+            totalImports: 0,
+            totalExpenditure: 0,
+          });
+          setDocumentId(null);
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSupplierData();
+  }, [userId, onLogout]);
 
   const handleLocalSupplierChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -55,13 +153,16 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
   };
 
   const addLocalSupplier = () => {
+    if (!userId) {
+      console.warn('addLocalSupplier: userId is missing');
+      return;
+    }
     if (!newLocalSupplier.supplierName.trim() || 
         newLocalSupplier.expenditure <= 0 || 
         !newLocalSupplier.supplierClassification.trim()) {
       alert('Please fill in the Supplier Name, Expenditure (greater than 0), and Supplier Classification.');
       return;
     }
-
     const updatedSuppliers = [...localSuppliers, newLocalSupplier];
     setLocalSuppliers(updatedSuppliers);
     resetNewLocalSupplier();
@@ -74,13 +175,16 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
   };
 
   const saveEditedLocalSupplier = () => {
+    if (!userId) {
+      console.warn('saveEditedLocalSupplier: userId is missing');
+      return;
+    }
     if (!newLocalSupplier.supplierName.trim() || 
         newLocalSupplier.expenditure <= 0 || 
         !newLocalSupplier.supplierClassification.trim()) {
       alert('Please fill in the Supplier Name, Expenditure (greater than 0), and Supplier Classification.');
       return;
     }
-
     const updatedSuppliers = localSuppliers.map((supplier, index) =>
       index === editingSupplierIndex ? newLocalSupplier : supplier
     );
@@ -90,10 +194,81 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
     recalculateLocalSummary(updatedSuppliers);
   };
 
-  const deleteLocalSupplier = (index) => {
-    const updatedSuppliers = localSuppliers.filter((_, i) => i !== index);
-    setLocalSuppliers(updatedSuppliers);
-    recalculateLocalSummary(updatedSuppliers);
+  const deleteLocalSupplier = async (index) => {
+    if (!userId) {
+      console.warn('deleteLocalSupplier: userId is missing');
+      return;
+    }
+    if (window.confirm('Are you sure you want to delete this local supplier?')) {
+      setIsLoading(true);
+      try {
+        const updatedSuppliers = localSuppliers.filter((_, i) => i !== index);
+        setLocalSuppliers(updatedSuppliers);
+        recalculateLocalSummary(updatedSuppliers);
+
+        let currentDocumentId = documentId;
+        if (!currentDocumentId) {
+          const checkResponse = await axios.get(`http://localhost:5000/supplier-development/${userId}`);
+          if (checkResponse.data.data.length === 0) {
+            throw new Error('No supplier development data found for this user');
+          }
+          currentDocumentId = checkResponse.data.data[0].id;
+          setDocumentId(currentDocumentId);
+        }
+
+        const response = await axios.put(`http://localhost:5000/supplier-development/${currentDocumentId}`, {
+          userId,
+          localSuppliers: updatedSuppliers,
+          localSummary,
+          imports,
+          importSummary,
+        });
+
+        console.log('Local supplier deleted successfully:', response.data);
+      } catch (error) {
+        console.error('Error deleting local supplier:', error);
+        alert(`Failed to delete local supplier: ${error.response?.data?.error || error.message}`);
+        try {
+          const response = await axios.get(`http://localhost:5000/supplier-development/${userId}`);
+          if (response.data.data.length > 0) {
+            setLocalSuppliers(response.data.data[0].localSuppliers || []);
+            setImports(response.data.data[0].imports || []);
+            setLocalSummary(response.data.data[0].localSummary || {
+              totalSuppliers: 0,
+              totalExpenditure: 0,
+              blackOwnedSuppliers: 0,
+              blackWomanOwnedSuppliers: 0,
+              esdRecipients: 0,
+            });
+            setImportSummary(response.data.data[0].importSummary || {
+              totalImports: 0,
+              totalExpenditure: 0,
+            });
+            setDocumentId(response.data.data[0].id);
+          } else {
+            setLocalSuppliers([]);
+            setImports([]);
+            setLocalSummary({
+              totalSuppliers: 0,
+              totalExpenditure: 0,
+              blackOwnedSuppliers: 0,
+              blackWomanOwnedSuppliers: 0,
+              esdRecipients: 0,
+            });
+            setImportSummary({
+              totalImports: 0,
+              totalExpenditure: 0,
+            });
+            setDocumentId(null);
+          }
+        } catch (fetchError) {
+          console.error('Error re-fetching data:', fetchError);
+          alert('Failed to restore data. Please refresh the page.');
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    }
   };
 
   const resetNewLocalSupplier = () => {
@@ -129,7 +304,6 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
       blackWomanOwnedSuppliers: 0,
       esdRecipients: 0,
     });
-
     setLocalSummary(summary);
   };
 
@@ -142,13 +316,16 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
   };
 
   const addImport = () => {
+    if (!userId) {
+      console.warn('addImport: userId is missing');
+      return;
+    }
     if (!newImport.foreignSupplierName.trim() || 
         newImport.expenditure <= 0 || 
         !newImport.goodsServices.trim()) {
       alert('Please fill in the Foreign Supplier Name, Expenditure (greater than 0), and Goods/Services.');
       return;
     }
-
     const updatedImports = [...imports, newImport];
     setImports(updatedImports);
     resetNewImport();
@@ -161,13 +338,16 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
   };
 
   const saveEditedImport = () => {
+    if (!userId) {
+      console.warn('saveEditedImport: userId is missing');
+      return;
+    }
     if (!newImport.foreignSupplierName.trim() || 
         newImport.expenditure <= 0 || 
         !newImport.goodsServices.trim()) {
       alert('Please fill in the Foreign Supplier Name, Expenditure (greater than 0), and Goods/Services.');
       return;
     }
-
     const updatedImports = imports.map((imp, index) =>
       index === editingImportIndex ? newImport : imp
     );
@@ -177,10 +357,81 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
     recalculateImportSummary(updatedImports);
   };
 
-  const deleteImport = (index) => {
-    const updatedImports = imports.filter((_, i) => i !== index);
-    setImports(updatedImports);
-    recalculateImportSummary(updatedImports);
+  const deleteImport = async (index) => {
+    if (!userId) {
+      console.warn('deleteImport: userId is missing');
+      return;
+    }
+    if (window.confirm('Are you sure you want to delete this import?')) {
+      setIsLoading(true);
+      try {
+        const updatedImports = imports.filter((_, i) => i !== index);
+        setImports(updatedImports);
+        recalculateImportSummary(updatedImports);
+
+        let currentDocumentId = documentId;
+        if (!currentDocumentId) {
+          const checkResponse = await axios.get(`http://localhost:5000/supplier-development/${userId}`);
+          if (checkResponse.data.data.length === 0) {
+            throw new Error('No supplier development data found for this user');
+          }
+          currentDocumentId = checkResponse.data.data[0].id;
+          setDocumentId(currentDocumentId);
+        }
+
+        const response = await axios.put(`http://localhost:5000/supplier-development/${currentDocumentId}`, {
+          userId,
+          localSuppliers,
+          localSummary,
+          imports: updatedImports,
+          importSummary,
+        });
+
+        console.log('Import deleted successfully:', response.data);
+      } catch (error) {
+        console.error('Error deleting import:', error);
+        alert(`Failed to delete import: ${error.response?.data?.error || error.message}`);
+        try {
+          const response = await axios.get(`http://localhost:5000/supplier-development/${userId}`);
+          if (response.data.data.length > 0) {
+            setLocalSuppliers(response.data.data[0].localSuppliers || []);
+            setImports(response.data.data[0].imports || []);
+            setLocalSummary(response.data.data[0].localSummary || {
+              totalSuppliers: 0,
+              totalExpenditure: 0,
+              blackOwnedSuppliers: 0,
+              blackWomanOwnedSuppliers: 0,
+              esdRecipients: 0,
+            });
+            setImportSummary(response.data.data[0].importSummary || {
+              totalImports: 0,
+              totalExpenditure: 0,
+            });
+            setDocumentId(response.data.data[0].id);
+          } else {
+            setLocalSuppliers([]);
+            setImports([]);
+            setLocalSummary({
+              totalSuppliers: 0,
+              totalExpenditure: 0,
+              blackOwnedSuppliers: 0,
+              blackWomanOwnedSuppliers: 0,
+              esdRecipients: 0,
+            });
+            setImportSummary({
+              totalImports: 0,
+              totalExpenditure: 0,
+            });
+            setDocumentId(null);
+          }
+        } catch (fetchError) {
+          console.error('Error re-fetching data:', fetchError);
+          alert('Failed to restore data. Please refresh the page.');
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    }
   };
 
   const resetNewImport = () => {
@@ -202,15 +453,149 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
       totalImports: 0,
       totalExpenditure: 0,
     });
-
     setImportSummary(summary);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onSubmit({ localSuppliers, localSummary, imports, importSummary });
-    onClose();
+    console.log('Submitting supplier development data:', { userId, localSuppliers, localSummary, imports, importSummary });
+    if (!userId) {
+      console.warn('handleSubmit: userId is missing');
+      alert('User ID is missing. Please log in again.');
+      return;
+    }
+
+    // Check if there is at least one local supplier or import
+    if (localSuppliers.length === 0 && imports.length === 0) {
+      alert('Please add at least one local supplier or import before submitting.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      let method = 'post';
+      let url = 'http://localhost:5000/supplier-development';
+      let existingId = null;
+
+      try {
+        const checkResponse = await axios.get(`http://localhost:5000/supplier-development/${userId}`);
+        if (checkResponse.data.data.length > 0) {
+          method = 'put';
+          existingId = checkResponse.data.data[0].id;
+          url = `http://localhost:5000/supplier-development/${existingId}`;
+        }
+      } catch (checkError) {
+        if (checkError.response?.status === 404) {
+          if (checkError.response.data.error === 'User not found') {
+            alert('Your account is not set up. Please log in again.');
+            onLogout();
+            return;
+          }
+          console.warn('No existing supplier development data found for userId:', userId);
+        } else {
+          throw checkError;
+        }
+      }
+
+      const response = await axios[method](url, { userId, localSuppliers, localSummary, imports, importSummary });
+      console.log('Supplier development data saved:', response.data);
+      setDocumentId(response.data.id);
+      onSubmit({ localSuppliers, localSummary, imports, importSummary });
+      onClose();
+    } catch (error) {
+      console.error('Error saving supplier development data:', error);
+      alert(`Failed to save supplier development data: ${error.response?.data?.error || error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  const deleteSupplierDevelopment = async () => {
+    if (!userId) {
+      console.warn('deleteSupplierDevelopment: userId is missing');
+      return;
+    }
+    if (window.confirm('Are you sure you want to delete all supplier development data for this user?')) {
+      setIsLoading(true);
+      try {
+        const response = await axios.delete(`http://localhost:5000/supplier-development/${userId}`);
+        console.log('Supplier development data deleted:', response.data);
+        setLocalSuppliers([]);
+        setImports([]);
+        setLocalSummary({
+          totalSuppliers: 0,
+          totalExpenditure: 0,
+          blackOwnedSuppliers: 0,
+          blackWomanOwnedSuppliers: 0,
+          esdRecipients: 0,
+        });
+        setImportSummary({
+          totalImports: 0,
+          totalExpenditure: 0,
+        });
+        setDocumentId(null);
+      } catch (error) {
+        console.error('Error deleting supplier development data:', error);
+        alert(`Failed to delete: ${error.response?.data?.error || error.message}`);
+        try {
+          const response = await axios.get(`http://localhost:5000/supplier-development/${userId}`);
+          if (response.data.data.length > 0) {
+            setLocalSuppliers(response.data.data[0].localSuppliers || []);
+            setImports(response.data.data[0].imports || []);
+            setLocalSummary(response.data.data[0].localSummary || {
+              totalSuppliers: 0,
+              totalExpenditure: 0,
+              blackOwnedSuppliers: 0,
+              blackWomanOwnedSuppliers: 0,
+              esdRecipients: 0,
+            });
+            setImportSummary(response.data.data[0].importSummary || {
+              totalImports: 0,
+              totalExpenditure: 0,
+            });
+            setDocumentId(response.data.data[0].id);
+          } else {
+            setLocalSuppliers([]);
+            setImports([]);
+            setLocalSummary({
+              totalSuppliers: 0,
+              totalExpenditure: 0,
+              blackOwnedSuppliers: 0,
+              blackWomanOwnedSuppliers: 0,
+              esdRecipients: 0,
+            });
+            setImportSummary({
+              totalImports: 0,
+              totalExpenditure: 0,
+            });
+            setDocumentId(null);
+          }
+        } catch (fetchError) {
+          console.error('Error re-fetching data:', fetchError);
+          alert('Failed to restore data. Please refresh the page.');
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  if (!userId) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg shadow-md p-6 w-full max-w-md">
+          <h2 className="text-xl font-semibold mb-4">Error</h2>
+          <p className="text-red-600 mb-4">User ID is missing. Please ensure you are logged in and try again.</p>
+          <button
+            onClick={onClose}
+            className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -231,7 +616,7 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
                   onChange={handleLocalSupplierChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter supplier name"
-                  required
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -243,6 +628,7 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
                   onChange={handleLocalSupplierChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter site/location"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -254,6 +640,7 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
                   onChange={handleLocalSupplierChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter registration number"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -265,6 +652,7 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
                   onChange={handleLocalSupplierChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter VAT number"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -277,7 +665,7 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
                   className="w-full p-2 border rounded"
                   placeholder="Enter expenditure"
                   min="0"
-                  required
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -287,7 +675,7 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
                   value={newLocalSupplier.supplierClassification}
                   onChange={handleLocalSupplierChange}
                   className="w-full p-2 border rounded"
-                  required
+                  disabled={isLoading}
                 >
                   <option value="">Select Classification</option>
                   <option value="QSE">QSE</option>
@@ -302,6 +690,7 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
                   value={newLocalSupplier.beeLevel}
                   onChange={handleLocalSupplierChange}
                   className="w-full p-2 border rounded"
+                  disabled={isLoading}
                 >
                   <option value="">Select BEE Level</option>
                   {[...Array(8).keys()].map((level) => (
@@ -319,6 +708,7 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
                   checked={newLocalSupplier.is30PercentBlackOwned}
                   onChange={handleLocalSupplierChange}
                   className="mr-2"
+                  disabled={isLoading}
                 />
                 <label className="text-sm font-medium">30% or more Black Owned</label>
               </div>
@@ -329,6 +719,7 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
                   checked={newLocalSupplier.is51PercentBlackOwned}
                   onChange={handleLocalSupplierChange}
                   className="mr-2"
+                  disabled={isLoading}
                 />
                 <label className="text-sm font-medium">51% or more Black Owned (Flow-through)</label>
               </div>
@@ -339,6 +730,7 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
                   checked={newLocalSupplier.is30PercentBlackWomanOwned}
                   onChange={handleLocalSupplierChange}
                   className="mr-2"
+                  disabled={isLoading}
                 />
                 <label className="text-sm font-medium">30% or more Black Woman Owned</label>
               </div>
@@ -353,6 +745,7 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
                   placeholder="Enter percentage"
                   min="0"
                   max="100"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -366,6 +759,7 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
                   placeholder="Enter percentage"
                   min="0"
                   max="100"
+                  disabled={isLoading}
                 />
               </div>
               <div className="flex items-center">
@@ -375,6 +769,7 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
                   checked={newLocalSupplier.isESDRecipient}
                   onChange={handleLocalSupplierChange}
                   className="mr-2"
+                  disabled={isLoading}
                 />
                 <label className="text-sm font-medium">ESD Recipient & Designated Group Supplier (QSE/EME)</label>
               </div>
@@ -386,13 +781,15 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
                   value={newLocalSupplier.beeCertificateExpiryDate}
                   onChange={handleLocalSupplierChange}
                   className="w-full p-2 border rounded"
+                  disabled={isLoading}
                 />
               </div>
             </div>
             <button
               type="button"
               onClick={editingSupplierIndex !== null ? saveEditedLocalSupplier : addLocalSupplier}
-              className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+              className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:bg-blue-300"
+              disabled={isLoading}
             >
               {editingSupplierIndex !== null ? 'Save Edited Supplier' : 'Add Local Supplier'}
             </button>
@@ -439,20 +836,21 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
                         <td className="border border-gray-300 px-4 py-2">{supplier.blackOwnedPercentage}%</td>
                         <td className="border border-gray-300 px-4 py-2">{supplier.blackWomanOwnedPercentage}%</td>
                         <td className="border border-gray-300 px-4 py-2">{supplier.isESDRecipient ? 'Yes' : 'No'}</td>
-                        <td className="border border-gray-3
-00 px-4 py-2">{supplier.beeCertificateExpiryDate || 'N/A'}</td>
+                        <td className="border border-gray-300 px-4 py-2">{supplier.beeCertificateExpiryDate || 'N/A'}</td>
                         <td className="border border-gray-300 px-4 py-2">
                           <button
                             type="button"
                             onClick={() => editLocalSupplier(index)}
-                            className="bg-yellow-500 text-white px-2 py-1 rounded mr-2 hover:bg-yellow-600"
+                            className="bg-yellow-500 text-white px-2 py-1 rounded mr-2 hover:bg-yellow-600 disabled:bg-yellow-300"
+                            disabled={isLoading}
                           >
                             Edit
                           </button>
                           <button
                             type="button"
                             onClick={() => deleteLocalSupplier(index)}
-                            className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
+                            className="bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700 disabled:bg-red-300"
+                            disabled={isLoading}
                           >
                             Delete
                           </button>
@@ -530,7 +928,7 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
                   onChange={handleImportChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter foreign supplier name"
-                  required
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -542,6 +940,7 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
                   onChange={handleImportChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter site/location"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -553,7 +952,7 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
                   onChange={handleImportChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter goods/services"
-                  required
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -566,7 +965,7 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
                   className="w-full p-2 border rounded"
                   placeholder="Enter expenditure"
                   min="0"
-                  required
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -578,6 +977,7 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
                   onChange={handleImportChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter reason for import"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -589,13 +989,15 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
                   onChange={handleImportChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter ESD plan"
+                  disabled={isLoading}
                 />
               </div>
             </div>
             <button
               type="button"
               onClick={editingImportIndex !== null ? saveEditedImport : addImport}
-              className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+              className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:bg-blue-300"
+              disabled={isLoading}
             >
               {editingImportIndex !== null ? 'Save Edited Import' : 'Add Import'}
             </button>
@@ -631,14 +1033,16 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
                           <button
                             type="button"
                             onClick={() => editImport(index)}
-                            className="bg-yellow-500 text-white px-2 py-1 rounded mr-2 hover:bg-yellow-600"
+                            className="bg-yellow-500 text-white px-2 py-1 rounded mr-2 hover:bg-yellow-600 disabled:bg-yellow-300"
+                            disabled={isLoading}
                           >
                             Edit
                           </button>
                           <button
                             type="button"
                             onClick={() => deleteImport(index)}
-                            className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
+                            className="bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700 disabled:bg-red-300"
+                            disabled={isLoading}
                           >
                             Delete
                           </button>
@@ -676,25 +1080,44 @@ const SupplierDevelopment = ({ onClose, onSubmit }) => {
             </div>
           </div>
 
-          <div className="flex justify-end gap-4">
+          <div className="fixed bottom-4 sm:bottom-12 right-2 sm:right-4 md:right-78 flex flex-col sm:flex-row justify-end gap-2 sm:gap-4 bg-white p-3 sm:p-4 rounded-md shadow-lg w-[90%] sm:w-auto max-w-md">
             <button
               type="button"
               onClick={onClose}
-              className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300"
+              className="bg-gray-200 text-gray-800 px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-gray-300 w-full sm:w-auto transition-all duration-200 disabled:bg-gray-100"
+              disabled={isLoading}
             >
               Cancel
             </button>
+            {(localSuppliers.length > 0 || imports.length > 0) && (
+              <button
+                type="button"
+                onClick={deleteSupplierDevelopment}
+                className="bg-red-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-red-700 w-full sm:w-auto transition-all duration-200 disabled:bg-red-300"
+                disabled={isLoading}
+              >
+                Delete Supplier Development Details
+              </button>
+            )}
             <button
               type="submit"
-              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+              className="bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-blue-700 w-full sm:w-auto transition-all duration-200 disabled:bg-blue-300"
+              disabled={isLoading}
             >
-              Save Supplier Development & Imports
+              Save Supplier Development Details
             </button>
           </div>
         </form>
       </div>
     </div>
   );
+};
+
+SupplierDevelopment.propTypes = {
+  userId: PropTypes.string.isRequired,
+  onClose: PropTypes.func.isRequired,
+  onSubmit: PropTypes.func.isRequired,
+  onLogout: PropTypes.func.isRequired,
 };
 
 export default SupplierDevelopment;

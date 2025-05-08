@@ -2024,4 +2024,289 @@ app.get("/socio-economic-development/:userId", async (req, res) => {
 });
 
 
+// Supplier Development - Retrieve
+app.get('/supplier-development/:userId', async (req, res) => {
+  console.log('Supplier Development GET hit with userId:', req.params.userId);
+  const { userId } = req.params;
+
+  try {
+    if (!userId) {
+      console.log('Missing userId in GET request');
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    console.log('Checking clients collection for userId:', userId);
+    const userDoc = await adminDb.collection('clients').doc(userId).get();
+    if (!userDoc.exists) {
+      console.log('User not found for userId:', userId);
+      const clientsSnapshot = await adminDb.collection('clients').get();
+      console.log('Existing client IDs:', clientsSnapshot.docs.map(doc => doc.id));
+      return res.status(404).json({ error: 'User not found' });
+    }
+    console.log('Client found for userId:', userId, 'Data:', userDoc.data());
+
+    const querySnapshot = await adminDb.collection('supplierDevelopment').where('userId', '==', userId).get();
+    const supplierRecords = querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
+    if (supplierRecords.length === 0) {
+      console.log('No supplier development data found for userId:', userId);
+      return res.status(404).json({ message: 'No supplier development data found for this user' });
+    }
+
+    console.log('Supplier development data retrieved for userId:', userId);
+    res.status(200).json({
+      message: 'Supplier development data retrieved successfully',
+      data: supplierRecords,
+    });
+  } catch (error) {
+    console.error('Supplier development retrieval error:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to retrieve supplier development data', code: error.code });
+  }
+});
+
+// Supplier Development - Create
+app.post('/supplier-development', async (req, res) => {
+  console.log('Supplier Development POST hit with body:', req.body);
+  const { userId, localSuppliers, localSummary, imports, importSummary } = req.body;
+
+  try {
+    if (!userId) {
+      console.log('Missing userId');
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+    if (!localSuppliers || !Array.isArray(localSuppliers)) {
+      console.log('Invalid localSuppliers data');
+      return res.status(400).json({ error: 'Local suppliers must be an array' });
+    }
+    if (!localSummary || typeof localSummary !== 'object') {
+      console.log('Invalid localSummary data');
+      return res.status(400).json({ error: 'Local summary must be an object' });
+    }
+    if (!imports || !Array.isArray(imports)) {
+      console.log('Invalid imports data');
+      return res.status(400).json({ error: 'Imports must be an array' });
+    }
+    if (!importSummary || typeof importSummary !== 'object') {
+      console.log('Invalid importSummary data');
+      return res.status(400).json({ error: 'Import summary must be an object' });
+    }
+
+    console.log('Checking clients collection for userId:', userId);
+    const userDoc = await adminDb.collection('clients').doc(userId).get();
+    if (!userDoc.exists) {
+      console.log('User not found for userId:', userId);
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const supplierRef = adminDb.collection('supplierDevelopment');
+    const q = await supplierRef.where('userId', '==', userId).get();
+    if (!q.empty) {
+      console.log('Supplier development already exists for userId:', userId);
+      return res.status(409).json({
+        error: 'Supplier development already exists for this user. Use PUT to update.',
+        existingId: q.docs[0].id,
+      });
+    }
+
+    const supplierDevelopmentData = {
+      userId,
+      localSuppliers: localSuppliers.map((supplier) => ({
+        supplierName: supplier.supplierName || '',
+        siteLocation: supplier.siteLocation || '',
+        regNo: supplier.regNo || '',
+        vatNo: supplier.vatNo || '',
+        expenditure: Number(supplier.expenditure) || 0,
+        supplierClassification: supplier.supplierClassification || '',
+        beeLevel: supplier.beeLevel || '',
+        is30PercentBlackOwned: Boolean(supplier.is30PercentBlackOwned),
+        is51PercentBlackOwned: Boolean(supplier.is51PercentBlackOwned),
+        is30PercentBlackWomanOwned: Boolean(supplier.is30PercentBlackWomanOwned),
+        blackOwnedPercentage: Number(supplier.blackOwnedPercentage) || 0,
+        blackWomanOwnedPercentage: Number(supplier.blackWomanOwnedPercentage) || 0,
+        isESDRecipient: Boolean(supplier.isESDRecipient),
+        beeCertificateExpiryDate: supplier.beeCertificateExpiryDate || '',
+      })),
+      localSummary: {
+        totalSuppliers: Number(localSummary.totalSuppliers) || 0,
+        totalExpenditure: Number(localSummary.totalExpenditure) || 0,
+        blackOwnedSuppliers: Number(localSummary.blackOwnedSuppliers) || 0,
+        blackWomanOwnedSuppliers: Number(localSummary.blackWomanOwnedSuppliers) || 0,
+        esdRecipients: Number(localSummary.esdRecipients) || 0,
+      },
+      imports: imports.map((imp) => ({
+        foreignSupplierName: imp.foreignSupplierName || '',
+        siteLocation: imp.siteLocation || '',
+        goodsServices: imp.goodsServices || '',
+        expenditure: Number(imp.expenditure) || 0,
+        reasonForImport: imp.reasonForImport || '',
+        esdPlan: imp.esdPlan || '',
+      })),
+      importSummary: {
+        totalImports: Number(importSummary.totalImports) || 0,
+        totalExpenditure: Number(importSummary.totalExpenditure) || 0,
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const docRef = await adminDb.collection('supplierDevelopment').add(supplierDevelopmentData);
+    console.log('Write successful, doc ID:', docRef.id);
+
+    res.status(201).json({
+      message: 'Supplier development data saved successfully',
+      id: docRef.id,
+      ...supplierDevelopmentData,
+    });
+  } catch (error) {
+    console.error('Detailed error in POST /supplier-development:', error.message, error.stack);
+    res.status(400).json({ error: error.message, code: error.code });
+  }
+});
+
+// Supplier Development - Update
+app.put('/supplier-development/:id', async (req, res) => {
+  console.log('Supplier Development PUT hit with body:', req.body);
+  const { id } = req.params;
+  const { userId, localSuppliers, localSummary, imports, importSummary } = req.body;
+
+  try {
+    if (!userId) {
+      console.log('Validation failed: Missing userId');
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+    if (!localSuppliers || !Array.isArray(localSuppliers)) {
+      console.log('Validation failed: Local suppliers is not an array or missing', { localSuppliers });
+      return res.status(400).json({ error: 'Local suppliers must be an array' });
+    }
+    if (!localSummary || typeof localSummary !== 'object') {
+      console.log('Validation failed: Local summary is not an object or missing', { localSummary });
+      return res.status(400).json({ error: 'Local summary must be an object' });
+    }
+    if (!imports || !Array.isArray(imports)) {
+      console.log('Validation failed: Imports is not an array or missing', { imports });
+      return res.status(400).json({ error: 'Imports must be an array' });
+    }
+    if (!importSummary || typeof importSummary !== 'object') {
+      console.log('Validation failed: Import summary is not an object or missing', { importSummary });
+      return res.status(400).json({ error: 'Import summary must be an object' });
+    }
+
+    const userDoc = await adminDb.collection('clients').doc(userId).get();
+    if (!userDoc.exists) {
+      console.log('User not found for userId:', userId);
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const docRef = adminDb.collection('supplierDevelopment').doc(id);
+    const existingDoc = await docRef.get();
+    if (!existingDoc.exists) {
+      console.log('Supplier development data not found for id:', id);
+      return res.status(404).json({ error: 'Supplier development data not found' });
+    }
+
+    const supplierDevelopmentData = {
+      userId,
+      localSuppliers: localSuppliers.map((supplier) => ({
+        supplierName: supplier.supplierName || '',
+        siteLocation: supplier.siteLocation || '',
+        regNo: supplier.regNo || '',
+        vatNo: supplier.vatNo || '',
+        expenditure: Number(supplier.expenditure) || 0,
+        supplierClassification: supplier.supplierClassification || '',
+        beeLevel: supplier.beeLevel || '',
+        is30PercentBlackOwned: Boolean(supplier.is30PercentBlackOwned),
+        is51PercentBlackOwned: Boolean(supplier.is51PercentBlackOwned),
+        is30PercentBlackWomanOwned: Boolean(supplier.is30PercentBlackWomanOwned),
+        blackOwnedPercentage: Number(supplier.blackOwnedPercentage) || 0,
+        blackWomanOwnedPercentage: Number(supplier.blackWomanOwnedPercentage) || 0,
+        isESDRecipient: Boolean(supplier.isESDRecipient),
+        beeCertificateExpiryDate: supplier.beeCertificateExpiryDate || '',
+      })),
+      localSummary: {
+        totalSuppliers: Number(localSummary.totalSuppliers) || 0,
+        totalExpenditure: Number(localSummary.totalExpenditure) || 0,
+        blackOwnedSuppliers: Number(localSummary.blackOwnedSuppliers) || 0,
+        blackWomanOwnedSuppliers: Number(localSummary.blackWomanOwnedSuppliers) || 0,
+        esdRecipients: Number(localSummary.esdRecipients) || 0,
+      },
+      imports: imports.map((imp) => ({
+        foreignSupplierName: imp.foreignSupplierName || '',
+        siteLocation: imp.siteLocation || '',
+        goodsServices: imp.goodsServices || '',
+        expenditure: Number(imp.expenditure) || 0,
+        reasonForImport: imp.reasonForImport || '',
+        esdPlan: imp.esdPlan || '',
+      })),
+      importSummary: {
+        totalImports: Number(importSummary.totalImports) || 0,
+        totalExpenditure: Number(importSummary.totalExpenditure) || 0,
+      },
+      updatedAt: new Date().toISOString(),
+    };
+
+    await docRef.update({
+      ...supplierDevelopmentData,
+      createdAt: existingDoc.data().createdAt,
+    });
+
+    console.log('Supplier development data updated with ID:', id);
+    res.status(200).json({
+      message: 'Supplier development data updated successfully',
+      id,
+      ...supplierDevelopmentData,
+    });
+  } catch (error) {
+    console.error('Detailed error in PUT /supplier-development:', {
+      message: error.message,
+      code: error.code,
+      stack: error.stack,
+      requestBody: req.body,
+    });
+    res.status(400).json({ error: error.message, code: error.code });
+  }
+});
+
+// Supplier Development - Delete
+app.delete('/supplier-development/:userId', async (req, res) => {
+  console.log('Supplier Development DELETE hit with userId:', req.params.userId);
+  const { userId } = req.params;
+
+  try {
+    if (!userId) {
+      console.log('Missing userId in params');
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    const userDoc = await adminDb.collection('clients').doc(userId).get();
+    if (!userDoc.exists) {
+      console.log('User not found for userId:', userId);
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const supplierRef = adminDb.collection('supplierDevelopment');
+    const query = await supplierRef.where('userId', '==', userId).get();
+
+    if (query.empty) {
+      console.log('No supplier development data found for userId:', userId);
+      return res.status(404).json({ error: 'No supplier development data found for this user' });
+    }
+
+    const docToDelete = query.docs[0];
+    await adminDb.collection('supplierDevelopment').doc(docToDelete.id).delete();
+
+    console.log('Supplier development data deleted for userId:', userId);
+    res.status(200).json({
+      message: 'Supplier development data deleted successfully',
+      userId,
+      deletedDocId: docToDelete.id,
+    });
+  } catch (error) {
+    console.error('Detailed error in DELETE /supplier-development:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to delete supplier development data', details: error.message });
+  }
+});
+
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
