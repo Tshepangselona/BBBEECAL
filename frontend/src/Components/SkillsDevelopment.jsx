@@ -2,7 +2,10 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import PropTypes from 'prop-types';
 
+// SkillsDevelopment component, aligned with OwnershipDetails, ManagementControl, EmploymentEquity, and Yes4YouthInitiative
 const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
+  console.log('SkillsDevelopment rendered with userId:', userId);
+
   const categories = [
     { value: 'A', label: 'Bursaries: Institution-based, theoretical only, formally assessed (incl. Basic Education)' },
     { value: 'A2', label: 'Institution-based, theoretical instruction alone – formally assessed by educational institutions established by or registered with the Department of Higher Education & Training' },
@@ -47,42 +50,111 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
     unemployedLearners: 0,
     absorbedInternalTrainers: 0,
   });
+  const [isLoading, setIsLoading] = useState(false);
+  const [documentId, setDocumentId] = useState(null);
 
   useEffect(() => {
     console.log('SkillsDevelopment mounted with userId:', userId);
     if (!userId) {
       console.warn('SkillsDevelopment: userId prop is missing or undefined');
+      return;
     }
 
     const fetchSkillsData = async () => {
+      setIsLoading(true);
       try {
+        console.log('Fetching skills development data for userId:', userId);
         const response = await axios.get(`http://localhost:5000/skills-development/${userId}`);
         const records = response.data.data;
         if (records.length > 0) {
-          setTrainings(records[0].trainings);
-          setSummary(records[0].summary);
+          setTrainings(records[0].trainings || []);
+          setSummary(records[0].summary || {
+            totalTrainings: 0,
+            totalDirectExpenditure: 0,
+            totalAdditionalExpenditure: 0,
+            totalCostToCompanySalary: 0,
+            totalTrainingHours: 0,
+            totalParticipants: 0,
+            unemployedLearners: 0,
+            absorbedInternalTrainers: 0,
+          });
+          setDocumentId(records[0].id);
+          console.log('Set documentId:', records[0].id);
+        } else {
+          console.log('No skills development data found for userId:', userId);
+          setTrainings([]);
+          setSummary({
+            totalTrainings: 0,
+            totalDirectExpenditure: 0,
+            totalAdditionalExpenditure: 0,
+            totalCostToCompanySalary: 0,
+            totalTrainingHours: 0,
+            totalParticipants: 0,
+            unemployedLearners: 0,
+            absorbedInternalTrainers: 0,
+          });
+          setDocumentId(null);
         }
       } catch (error) {
-        console.error('Error fetching skills development data:', error);
+        console.warn('Error fetching skills development data:', error.response?.data?.error || error.message);
+        if (error.response?.status === 404) {
+          setTrainings([]);
+          setSummary({
+            totalTrainings: 0,
+            totalDirectExpenditure: 0,
+            totalAdditionalExpenditure: 0,
+            totalCostToCompanySalary: 0,
+            totalTrainingHours: 0,
+            totalParticipants: 0,
+            unemployedLearners: 0,
+            absorbedInternalTrainers: 0,
+          });
+          setDocumentId(null);
+        } else {
+          alert(`Failed to fetch skills development data: ${error.response?.data?.error || error.message}`);
+          setTrainings([]);
+          setSummary({
+            totalTrainings: 0,
+            totalDirectExpenditure: 0,
+            totalAdditionalExpenditure: 0,
+            totalCostToCompanySalary: 0,
+            totalTrainingHours: 0,
+            totalParticipants: 0,
+            unemployedLearners: 0,
+            absorbedInternalTrainers: 0,
+          });
+          setDocumentId(null);
+        }
+      } finally {
+        setIsLoading(false);
       }
     };
-    if (userId) fetchSkillsData();
+
+    fetchSkillsData();
   }, [userId]);
 
   const handleTrainingChange = (e) => {
     const { name, value, type, checked } = e.target;
+    if (name === 'costToCompanySalary') return;
     setNewTraining({
       ...newTraining,
-      [name]: type === 'checkbox' ? checked : value,
+      [name]: type === 'checkbox' ? checked : type === 'number' ? Number(value) : value,
     });
   };
 
   const addTraining = () => {
+    if (!userId) {
+      console.warn('addTraining: userId is missing');
+      return;
+    }
     if (!newTraining.startDate || !newTraining.trainingCourse || !newTraining.learnerName || !newTraining.idNumber || !newTraining.category) {
       alert('Please fill in the Start Date, Training Course, Learner Name, ID Number, and Category.');
       return;
     }
-
+    if (trainings.some((training) => training.idNumber === newTraining.idNumber)) {
+      alert('A training with this ID Number already exists.');
+      return;
+    }
     const updatedTrainings = [...trainings, newTraining];
     setTrainings(updatedTrainings);
     resetNewTraining();
@@ -95,11 +167,22 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
   };
 
   const saveEditedTraining = () => {
+    if (!userId) {
+      console.warn('saveEditedTraining: userId is missing');
+      return;
+    }
     if (!newTraining.startDate || !newTraining.trainingCourse || !newTraining.learnerName || !newTraining.idNumber || !newTraining.category) {
       alert('Please fill in the Start Date, Training Course, Learner Name, ID Number, and Category.');
       return;
     }
-
+    if (
+      trainings.some(
+        (training, index) => training.idNumber === newTraining.idNumber && index !== editingTrainingIndex
+      )
+    ) {
+      alert('A training with this ID Number already exists.');
+      return;
+    }
     const updatedTrainings = trainings.map((training, index) =>
       index === editingTrainingIndex ? newTraining : training
     );
@@ -109,10 +192,75 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
     recalculateSummary(updatedTrainings);
   };
 
-  const deleteTraining = (index) => {
-    const updatedTrainings = trainings.filter((_, i) => i !== index);
-    setTrainings(updatedTrainings);
-    recalculateSummary(updatedTrainings);
+  const deleteTraining = async (index) => {
+    if (!userId) {
+      console.warn('deleteTraining: userId is missing');
+      return;
+    }
+    if (window.confirm('Are you sure you want to delete this training?')) {
+      setIsLoading(true);
+      try {
+        const updatedTrainings = trainings.filter((_, i) => i !== index);
+        setTrainings(updatedTrainings);
+        recalculateSummary(updatedTrainings);
+
+        let currentDocumentId = documentId;
+        if (!currentDocumentId) {
+          const checkResponse = await axios.get(`http://localhost:5000/skills-development/${userId}`);
+          if (checkResponse.data.data.length === 0) {
+            throw new Error('No skills development data found for this user');
+          }
+          currentDocumentId = checkResponse.data.data[0].id;
+          setDocumentId(currentDocumentId);
+        }
+
+        const response = await axios.put(`http://localhost:5000/skills-development/${currentDocumentId}`, {
+          userId,
+          trainings: updatedTrainings,
+          summary,
+        });
+
+        console.log('Training deleted successfully:', response.data);
+      } catch (error) {
+        console.error('Error deleting training:', error);
+        alert(`Failed to delete training: ${error.response?.data?.error || error.message}`);
+        try {
+          const response = await axios.get(`http://localhost:5000/skills-development/${userId}`);
+          if (response.data.data.length > 0) {
+            setTrainings(response.data.data[0].trainings || []);
+            setSummary(response.data.data[0].summary || {
+              totalTrainings: 0,
+              totalDirectExpenditure: 0,
+              totalAdditionalExpenditure: 0,
+              totalCostToCompanySalary: 0,
+              totalTrainingHours: 0,
+              totalParticipants: 0,
+              unemployedLearners: 0,
+              absorbedInternalTrainers: 0,
+            });
+            setDocumentId(response.data.data[0].id);
+          } else {
+            setTrainings([]);
+            setSummary({
+              totalTrainings: 0,
+              totalDirectExpenditure: 0,
+              totalAdditionalExpenditure: 0,
+              totalCostToCompanySalary: 0,
+              totalTrainingHours: 0,
+              totalParticipants: 0,
+              unemployedLearners: 0,
+              absorbedInternalTrainers: 0,
+            });
+            setDocumentId(null);
+          }
+        } catch (fetchError) {
+          console.error('Error re-fetching data:', fetchError);
+          alert('Failed to restore data. Please refresh the page.');
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    }
   };
 
   const resetNewTraining = () => {
@@ -150,11 +298,11 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
     let absorbedInternalTrainers = 0;
 
     updatedTrainings.forEach((training) => {
-      totalDirectExpenditure += Number(training.totalDirectExpenditure);
-      totalAdditionalExpenditure += Number(training.additionalExpenditure);
-      totalCostToCompanySalary += Number(training.costToCompanySalary);
-      totalTrainingHours += Number(training.trainingDurationHours);
-      totalParticipants += Number(training.numberOfParticipants);
+      totalDirectExpenditure += Number(training.totalDirectExpenditure) || 0;
+      totalAdditionalExpenditure += Number(training.additionalExpenditure) || 0;
+      totalCostToCompanySalary += Number(training.costToCompanySalary) || 0;
+      totalTrainingHours += Number(training.trainingDurationHours) || 0;
+      totalParticipants += Number(training.numberOfParticipants) || 0;
       if (training.isUnemployedLearner) unemployedLearners += 1;
       if (training.isAbsorbedInternalTrainer) absorbedInternalTrainers += 1;
     });
@@ -173,62 +321,132 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Submitting data:', { userId, trainings, summary });
-
+    console.log('Submitting skills development data:', { userId, trainings, summary });
     if (!userId) {
-      console.error('handleSubmit: userId is missing. Ensure the user is logged in and userId is passed as a prop.');
-      alert('User ID is missing. Please ensure you are logged in and try again.');
+      console.warn('handleSubmit: userId is missing');
       return;
     }
 
+    setIsLoading(true);
     try {
-      const checkResponse = await axios.get(`http://localhost:5000/skills-development/${userId}`);
-
+      // Check for existing data, handle 404s like OwnershipDetails/Yes4YouthInitiative
       let method = 'post';
       let url = 'http://localhost:5000/skills-development';
-      if (checkResponse.data.data.length > 0) {
-        method = 'put';
-        const existingId = checkResponse.data.data[0].id;
-        url = `http://localhost:5000/skills-development/${existingId}`;
+      let existingId = null;
+
+      try {
+        const checkResponse = await axios.get(`http://localhost:5000/skills-development/${userId}`);
+        if (checkResponse.data.data.length > 0) {
+          method = 'put';
+          existingId = checkResponse.data.data[0].id;
+          url = `http://localhost:5000/skills-development/${existingId}`;
+        }
+      } catch (checkError) {
+        if (checkError.response?.status === 404) {
+          if (checkError.response.data.error === 'User not found') {
+            alert('Your account is not set up. Please contact support or log in again.');
+            return;
+          }
+          console.warn('No existing skills development data found for userId:', userId);
+          // Proceed with POST for new data
+        } else {
+          throw checkError; // Re-throw other errors
+        }
       }
 
       const response = await axios[method](url, { userId, trainings, summary });
-
       console.log('Skills development data saved:', response.data);
+      setDocumentId(response.data.id);
       onSubmit({ trainings, summary });
       onClose();
     } catch (error) {
       console.error('Error saving skills development data:', error);
       alert(`Failed to save skills development data: ${error.response?.data?.error || error.message}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const deleteSkillsDevelopment = async () => {
     if (!userId) {
-      console.error('deleteSkillsDevelopment: userId is missing.');
-      alert('User ID is missing. Please ensure you are logged in and try again.');
+      console.warn('deleteSkillsDevelopment: userId is missing');
       return;
     }
-
-    try {
-      const response = await axios.delete(`http://localhost:5000/skills-development/${userId}`);
-      console.log('Skills development data deleted:', response.data);
-      setTrainings([]);
-      setSummary({
-        totalTrainings: 0,
-        totalDirectExpenditure: 0,
-        totalAdditionalExpenditure: 0,
-        totalCostToCompanySalary: 0,
-        totalTrainingHours: 0,
-        totalParticipants: 0,
-        unemployedLearners: 0,
-        absorbedInternalTrainers: 0,
-      });
-    } catch (error) {
-      console.error('Error deleting skills development data:', error);
-      alert(`Failed to delete: ${error.response?.data?.error || error.message}`);
+    if (window.confirm('Are you sure you want to delete all skills development data for this user?')) {
+      setIsLoading(true);
+      try {
+        const response = await axios.delete(`http://localhost:5000/skills-development/${userId}`);
+        console.log('Skills development data deleted:', response.data);
+        setTrainings([]);
+        setSummary({
+          totalTrainings: 0,
+          totalDirectExpenditure: 0,
+          totalAdditionalExpenditure: 0,
+          totalCostToCompanySalary: 0,
+          totalTrainingHours: 0,
+          totalParticipants: 0,
+          unemployedLearners: 0,
+          absorbedInternalTrainers: 0,
+        });
+        setDocumentId(null);
+      } catch (error) {
+        console.error('Error deleting skills development data:', error);
+        alert(`Failed to delete: ${error.response?.data?.error || error.message}`);
+        try {
+          const response = await axios.get(`http://localhost:5000/skills-development/${userId}`);
+          if (response.data.data.length > 0) {
+            setTrainings(response.data.data[0].trainings || []);
+            setSummary(response.data.data[0].summary || {
+              totalTrainings: 0,
+              totalDirectExpenditure: 0,
+              totalAdditionalExpenditure: 0,
+              totalCostToCompanySalary: 0,
+              totalTrainingHours: 0,
+              totalParticipants: 0,
+              unemployedLearners: 0,
+              absorbedInternalTrainers: 0,
+            });
+            setDocumentId(response.data.data[0].id);
+          } else {
+            setTrainings([]);
+            setSummary({
+              totalTrainings: 0,
+              totalDirectExpenditure: 0,
+              totalAdditionalExpenditure: 0,
+              totalCostToCompanySalary: 0,
+              totalTrainingHours: 0,
+              totalParticipants: 0,
+              unemployedLearners: 0,
+              absorbedInternalTrainers: 0,
+            });
+            setDocumentId(null);
+          }
+        } catch (fetchError) {
+          console.error('Error re-fetching data:', fetchError);
+          alert('Failed to restore data. Please refresh the page.');
+        }
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
+
+  if (!userId) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg shadow-md p-6 w-full max-w-md">
+          <h2 className="text-xl font-semibold mb-4">Error</h2>
+          <p className="text-red-600 mb-4">User ID is missing. Please ensure you are logged in and try again.</p>
+          <button
+            onClick={onClose}
+            className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -236,7 +454,6 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
         <h2 className="text-xl font-semibold mb-4">Skills Development Details</h2>
 
         <form onSubmit={handleSubmit}>
-          {/* Training Input Form */}
           <div className="mb-6">
             <h3 className="text-lg font-medium mb-2">Add Training Program</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -248,6 +465,7 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
                   value={newTraining.startDate}
                   onChange={handleTrainingChange}
                   className="w-full p-2 border rounded"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -258,6 +476,7 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
                   value={newTraining.endDate}
                   onChange={handleTrainingChange}
                   className="w-full p-2 border rounded"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -269,6 +488,7 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
                   onChange={handleTrainingChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter training course"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -280,6 +500,7 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
                   onChange={handleTrainingChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter trainer/provider"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -289,6 +510,7 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
                   value={newTraining.category}
                   onChange={handleTrainingChange}
                   className="w-full p-2 border rounded"
+                  disabled={isLoading}
                 >
                   <option value="">Select Category</option>
                   {categories.map((cat) => (
@@ -307,6 +529,7 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
                   onChange={handleTrainingChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter learner name"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -318,6 +541,7 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
                   onChange={handleTrainingChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter site/location"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -329,6 +553,7 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
                   onChange={handleTrainingChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter ID number"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -338,6 +563,7 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
                   value={newTraining.race}
                   onChange={handleTrainingChange}
                   className="w-full p-2 border rounded"
+                  disabled={isLoading}
                 >
                   <option value="">Select Race</option>
                   <option value="Black">Black</option>
@@ -354,6 +580,7 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
                   value={newTraining.gender}
                   onChange={handleTrainingChange}
                   className="w-full p-2 border rounded"
+                  disabled={isLoading}
                 >
                   <option value="">Select Gender</option>
                   <option value="Male">Male</option>
@@ -368,6 +595,7 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
                   checked={newTraining.isDisabled}
                   onChange={handleTrainingChange}
                   className="mr-2"
+                  disabled={isLoading}
                 />
                 <label className="text-sm font-medium">Disabled</label>
               </div>
@@ -380,6 +608,7 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
                   onChange={handleTrainingChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter skills"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -391,6 +620,7 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
                   onChange={handleTrainingChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter expenditure"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -402,6 +632,7 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
                   onChange={handleTrainingChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter additional expenditure"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -410,7 +641,6 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
                   type="number"
                   name="costToCompanySalary"
                   value={newTraining.costToCompanySalary}
-                  onChange={handleTrainingChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter salary"
                   disabled
@@ -425,6 +655,7 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
                   onChange={handleTrainingChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter hours"
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -436,6 +667,7 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
                   onChange={handleTrainingChange}
                   className="w-full p-2 border rounded"
                   placeholder="Enter number of participants"
+                  disabled={isLoading}
                 />
               </div>
               <div className="flex items-center">
@@ -445,6 +677,7 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
                   checked={newTraining.isUnemployedLearner}
                   onChange={handleTrainingChange}
                   className="mr-2"
+                  disabled={isLoading}
                 />
                 <label className="text-sm font-medium">Unemployed Learner</label>
               </div>
@@ -455,6 +688,7 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
                   checked={newTraining.isAbsorbedInternalTrainer}
                   onChange={handleTrainingChange}
                   className="mr-2"
+                  disabled={isLoading}
                 />
                 <label className="text-sm font-medium">Absorbed Internal Trainer</label>
               </div>
@@ -462,13 +696,13 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
             <button
               type="button"
               onClick={editingTrainingIndex !== null ? saveEditedTraining : addTraining}
-              className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+              className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:bg-blue-300"
+              disabled={isLoading}
             >
               {editingTrainingIndex !== null ? 'Save Edited Training' : 'Add Training'}
             </button>
           </div>
 
-          {/* Trainings Table */}
           {trainings.length > 0 && (
             <div className="mb-6">
               <h3 className="text-lg font-medium mb-2">Training Programs List</h3>
@@ -500,19 +734,19 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
                   </thead>
                   <tbody>
                     {trainings.map((training, index) => (
-                      <tr key={index}>
+                      <tr key={training.idNumber}>
                         <td className="border border-gray-300 px-4 py-2">{training.startDate}</td>
                         <td className="border border-gray-300 px-4 py-2">{training.endDate || 'N/A'}</td>
                         <td className="border border-gray-300 px-4 py-2">{training.trainingCourse}</td>
-                        <td className="border border-gray-300 px-4 py-2">{training.trainerProvider}</td>
+                        <td className="border border-gray-300 px-4 py-2">{training.trainerProvider || 'N/A'}</td>
                         <td className="border border-gray-300 px-4 py-2">{training.category}</td>
                         <td className="border border-gray-300 px-4 py-2">{training.learnerName}</td>
-                        <td className="border border-gray-300 px-4 py-2">{training.siteLocation}</td>
+                        <td className="border border-gray-300 px-4 py-2">{training.siteLocation || 'N/A'}</td>
                         <td className="border border-gray-300 px-4 py-2">{training.idNumber}</td>
-                        <td className="border border-gray-300 px-4 py-2">{training.race}</td>
-                        <td className="border border-gray-300 px-4 py-2">{training.gender}</td>
+                        <td className="border border-gray-300 px-4 py-2">{training.race || 'N/A'}</td>
+                        <td className="border border-gray-300 px-4 py-2">{training.gender || 'N/A'}</td>
                         <td className="border border-gray-300 px-4 py-2">{training.isDisabled ? 'Yes' : 'No'}</td>
-                        <td className="border border-gray-300 px-4 py-2">{training.coreCriticalSkills}</td>
+                        <td className="border border-gray-300 px-4 py-2">{training.coreCriticalSkills || 'N/A'}</td>
                         <td className="border border-gray-300 px-4 py-2">{training.totalDirectExpenditure}</td>
                         <td className="border border-gray-300 px-4 py-2">{training.additionalExpenditure}</td>
                         <td className="border border-gray-300 px-4 py-2">{training.costToCompanySalary}</td>
@@ -524,14 +758,16 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
                           <button
                             type="button"
                             onClick={() => editTraining(index)}
-                            className="bg-yellow-500 text-white px-2 py-1 rounded mr-2 hover:bg-yellow-600"
+                            className="bg-yellow-500 text-white px-2 py-1 rounded mr-2 hover:bg-yellow-600 disabled:bg-yellow-300"
+                            disabled={isLoading}
                           >
                             Edit
                           </button>
                           <button
                             type="button"
                             onClick={() => deleteTraining(index)}
-                            className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
+                            className="bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700 disabled:bg-red-300"
+                            disabled={isLoading}
                           >
                             Delete
                           </button>
@@ -544,7 +780,6 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
             </div>
           )}
 
-          {/* Summary Section */}
           <div className="mb-6">
             <h3 className="text-lg font-medium mb-2">Skills Development Summary</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -623,12 +858,12 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
             </div>
           </div>
 
-          {/* Buttons */}
           <div className="fixed bottom-4 sm:bottom-12 right-2 sm:right-4 md:right-78 flex flex-col sm:flex-row justify-end gap-2 sm:gap-4 bg-white p-3 sm:p-4 rounded-md shadow-lg w-[90%] sm:w-auto max-w-md">
             <button
               type="button"
               onClick={onClose}
-              className="bg-gray-200 text-gray-800 px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-gray-300 w-full sm:w-auto transition-all duration-200"
+              className="bg-gray-200 text-gray-800 px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-gray-300 w-full sm:w-auto transition-all duration-200 disabled:bg-gray-100"
+              disabled={isLoading}
             >
               Cancel
             </button>
@@ -636,14 +871,16 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
               <button
                 type="button"
                 onClick={deleteSkillsDevelopment}
-                className="bg-red-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-red-700 w-full sm:w-auto transition-all duration-200"
+                className="bg-red-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-red-700 w-full sm:w-auto transition-all duration-200 disabled:bg-red-300"
+                disabled={isLoading}
               >
                 Delete Skills Development Details
               </button>
             )}
             <button
               type="submit"
-              className="bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-blue-700 w-full sm:w-auto transition-all duration-200"
+              className="bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-blue-700 w-full sm:w-auto transition-all duration-200 disabled:bg-blue-300"
+              disabled={isLoading}
             >
               Save Skills Development Details
             </button>

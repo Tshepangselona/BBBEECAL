@@ -823,18 +823,21 @@ const Home = () => {
       )}
       {showSkillsDevelopmentModal && (
         <SkillsDevelopment
+          userId={userId}
           onClose={() => setShowSkillsDevelopmentModal(false)}
           onSubmit={handleSkillsDevelopmentSubmit}
         />
       )}
       {showSupplierDevelopmentModal && (
         <SupplierDevelopment
+          userId={userId}
           onClose={() => setShowSupplierDevelopmentModal(false)}
           onSubmit={handleSupplierDevelopmentSubmit}
         />
       )}
       {showEnterpriseDevelopmentModal && (
         <EnterpriseDevelopment
+          userId={userId}
           onClose={() => setShowEnterpriseDevelopmentModal(false)}
           onSubmit={handleEnterpriseDevelopmentSubmit}
         />

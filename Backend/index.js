@@ -1282,6 +1282,7 @@ app.delete('/yes4youth-initiative/:userId', async (req, res) => {
     res.status(500).json({ error: 'Failed to delete YES 4 Youth Initiative data', details: error.message });
   }
 });
+
 // Skills Development - Create
 app.post('/skills-development', async (req, res) => {
   console.log('Skills Development POST hit with body:', req.body);
@@ -1421,7 +1422,7 @@ app.put('/skills-development/:id', async (req, res) => {
       return res.status(400).json({ error: 'Summary must be an object' });
     }
 
-    const userDoc = await adminDb.collection('users').doc(userId).get();
+    const userDoc = await adminDb.collection('clients').doc(userId).get();
     if (!userDoc.exists) {
       console.log('User not found for userId:', userId);
       return res.status(404).json({ error: 'User not found' });
@@ -1472,7 +1473,7 @@ app.put('/skills-development/:id', async (req, res) => {
 
     await docRef.update({
       ...skillsDevelopmentData,
-      createdAt: existingDoc.data().createdAt, // Preserve original createdAt
+      createdAt: existingDoc.data().createdAt,
     });
 
     console.log('Skills development data updated with ID:', id);
@@ -1503,7 +1504,7 @@ app.delete('/skills-development/:userId', async (req, res) => {
       return res.status(400).json({ error: 'User ID is required' });
     }
 
-    const userDoc = await adminDb.collection('users').doc(userId).get();
+    const userDoc = await adminDb.collection('clients').doc(userId).get();
     if (!userDoc.exists) {
       console.log('User not found for userId:', userId);
       return res.status(404).json({ error: 'User not found' });
@@ -1514,7 +1515,7 @@ app.delete('/skills-development/:userId', async (req, res) => {
 
     if (query.empty) {
       console.log('No skills development data found for userId:', userId);
-      return res.status(404).json({ error: 'Skills development data not found for this user' });
+      return res.status(404).json({ error: 'No skills development data found for this user' });
     }
 
     const docToDelete = query.docs[0];
