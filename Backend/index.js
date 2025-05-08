@@ -78,6 +78,85 @@ const validateDateFormat = (dateStr) => {
   return true;
 };
 
+// Middleware to verify JWT and admin status
+const authenticateAdmin = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  console.log("Auth header:", authHeader ? "present" : "missing");
+
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    console.log("Missing or invalid authorization header");
+    return res.status(401).json({ error: "Authorization header missing or invalid" });
+  }
+
+  const token = authHeader.split("Bearer ")[1];
+  try {
+    console.log("Verifying JWT...");
+    const decoded = jwt.verify(token, JWT_SECRET);
+    console.log("JWT decoded:", decoded);
+
+    // Verify user is admin
+    const adminDoc = await getDoc(doc(db, "admin", decoded.uid));
+    if (!adminDoc.exists()) {
+      console.log("User is not admin, UID:", decoded.uid);
+      return res.status(403).json({ error: "User is not an admin" });
+    }
+
+    req.user = decoded;
+    next();
+  } catch (error) {
+    console.error("JWT verification error:", error.message);
+    return res.status(401).json({ error: "Invalid or expired token", code: error.code });
+  }
+};
+
+// Get-profile endpoint
+app.get("/get-profile", authenticateAdmin, async (req, res) => {
+  const { uid } = req.query;
+  console.log("Get profile request for UID:", uid, "by admin UID:", req.user.uid);
+
+  try {
+    if (!uid) {
+      console.log("Missing UID in request");
+      return res.status(400).json({ error: "User ID is required" });
+    }
+
+    if (!db) {
+      console.error("Firestore DB not initialized");
+      return res.status(500).json({ error: "Database not initialized" });
+    }
+
+    console.log("Fetching client document from Firestore for UID:", uid);
+    const clientDoc = await getDoc(doc(db, "clients", uid));
+    if (!clientDoc.exists()) {
+      console.log("Client not found for UID:", uid);
+      return res.status(404).json({ error: "Client not found" });
+    }
+
+    const data = clientDoc.data();
+    console.log("Profile data retrieved for UID:", uid, "Data:", data);
+
+    res.status(200).json({
+      businessName: data.businessName || "",
+      sector: data.sector || "",
+      financialYearEnd: data.financialYearEnd || null,
+      address: data.address || "",
+      contactNumber: data.contactNumber || "",
+      businessEmail: data.businessEmail || "",
+    });
+  } catch (error) {
+    console.error("Get profile error for UID:", uid, {
+      code: error.code,
+      message: error.message,
+      stack: error.stack,
+    });
+    res.status(500).json({
+      error: "Failed to fetch profile",
+      code: error.code,
+      details: error.message,
+    });
+  }
+});
+
 // Verify admin status
 app.get("/verify-admin", async (req, res) => {
   const authHeader = req.headers.authorization;
@@ -473,39 +552,6 @@ app.post("/signup", async (req, res) => {
   }
 });
 
-// Get-profile endpoint
-app.get("/get-profile", async (req, res) => {
-  const { uid } = req.query;
-  console.log("Get profile request for UID:", uid);
-
-  try {
-    if (!uid) {
-      console.log("Missing UID in request");
-      return res.status(400).json({ error: "User ID is required" });
-    }
-
-    const clientDoc = await getDoc(doc(db, "clients", uid));
-    if (!clientDoc.exists()) {
-      console.log("Client not found for UID:", uid);
-      return res.status(404).json({ error: "Client not found" });
-    }
-
-    const data = clientDoc.data();
-    console.log("Profile data retrieved:", data);
-
-    res.status(200).json({
-      businessName: data.businessName || "",
-      sector: data.sector || "",
-      financialYearEnd: data.financialYearEnd || null,
-      address: data.address || "",
-      contactNumber: data.contactNumber || "",
-      businessEmail: data.businessEmail || "",
-    });
-  } catch (error) {
-    console.error("Get profile error:", error.code, error.message);
-    res.status(500).json({ error: "Failed to fetch profile", code: error.code });
-  }
-});
 
 // Update-profile endpoint
 app.patch("/update-profile", async (req, res) => {

@@ -12,6 +12,8 @@ import AdminLogIn from "./Admin/Forms/AdminLogIn";
 import AdminSignUp from "./Admin/Forms/AdminSignUp";
 import LandingPage from "./LandingPage";
 import ProtectedRoute from "../src/ProtectedRoute";
+import Clients from "./Admin/Pages/Clients";
+import Charts from "./Admin/Pages/Charts";
 
 const router = createBrowserRouter(
   createRoutesFromElements(
@@ -26,6 +28,8 @@ const router = createBrowserRouter(
       <Route path="/AdminLogIn" element={<AdminLogIn />} />
       <Route path="/AdminSignUp" element={<AdminSignUp />} />
       <Route path="/Home" element={<Home />} />
+      <Route path="/Clients" element={<Clients />} />
+      <Route path="/Charts" element={<Charts />} />
     </>
   )
 );

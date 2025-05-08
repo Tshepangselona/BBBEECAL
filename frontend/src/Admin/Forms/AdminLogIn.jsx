@@ -32,9 +32,11 @@ export default function AdminLogIn() {
 
       if (!res.ok) throw new Error(data.error || "Something went wrong");
 
-      // Store JWT in localStorage
+      // Store JWT, uid, and businessEmail in localStorage
       localStorage.setItem("authToken", data.token);
-      console.log("Stored authToken in localStorage");
+      localStorage.setItem("uid", data.uid);
+      localStorage.setItem("businessEmail", data.businessEmail);
+      console.log("Stored authToken, uid, and businessEmail in localStorage");
 
       setSuccess(data.message);
       navigate("/AdminDashboard", {
@@ -56,9 +58,9 @@ export default function AdminLogIn() {
   return (
     <div className="max-w-md mx-auto mt-10 p-6 bg-white rounded-lg shadow-md">
       <div className="flex justify-center mb-6">
-              <Link to='/LandingPage'>
-              <img src={logo} alt="Forge Logo" className="h-16" />
-              </Link>
+        <Link to='/LandingPage'>
+          <img src={logo} alt="Forge Logo" className="h-16" />
+        </Link>
       </div>
       <h2 className="text-2xl font-bold mb-6 text-center">Admin Log In</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
