@@ -11,27 +11,38 @@ const SocioEconomicDevelopment = ({ userId, onClose, onSubmit }) => {
     dateOfContribution: "",
     contributionAmount: 0,
   });
-  const [editingBeneficiaryIndex, setEditingBeneficiaryIndex] = useState(null); // New state for editing
-
+  const [editingBeneficiaryIndex, setEditingBeneficiaryIndex] = useState(null);
   const [summary, setSummary] = useState({
     totalBeneficiaries: 0,
     totalContributionAmount: 0,
     averageBlackParticipation: 0,
   });
+  const [existingId, setExistingId] = useState(null);
 
   // Fetch existing data when component mounts
   useEffect(() => {
     const fetchSocioEconomicData = async () => {
       try {
+        console.log("Fetching socio-economic data for userId:", userId);
         const response = await fetch(`http://localhost:5000/socio-economic-development/${userId}`);
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error("GET request failed:", { status: response.status, errorText });
+          if (response.status === 404) {
+            console.log("No data found for userId, proceeding with empty form");
+            return; // Allow form to load
+          }
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
         const { data } = await response.json();
+        console.log("Retrieved socio-economic data:", data);
         if (data.length > 0) {
           setBeneficiaries(data[0].beneficiaries);
           setSummary(data[0].summary);
+          setExistingId(data[0].id);
         }
       } catch (error) {
-        console.error("Error fetching socio-economic development data:", error);
+        console.error("Error fetching socio-economic development data:", error.message);
       }
     };
     if (userId) fetchSocioEconomicData();
@@ -127,21 +138,66 @@ const SocioEconomicDevelopment = ({ userId, onClose, onSubmit }) => {
     e.preventDefault();
     try {
       const payload = { userId, beneficiaries, summary };
-      const response = await fetch("http://localhost:5000/socio-economic-development", {
-        method: "POST",
+      let method = "POST";
+      let url = "http://localhost:5000/socio-economic-development";
+      
+      if (existingId) {
+        method = "PUT";
+        url = `http://localhost:5000/socio-economic-development/${existingId}`;
+      }
+
+      console.log("Submitting socio-economic development data:", payload);
+      const response = await fetch(url, {
+        method,
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(payload),
       });
-      if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Submit request failed:", { status: response.status, errorText });
+        throw new Error(`HTTP error! Status: ${response.status}: ${errorText}`);
+      }
       const data = await response.json();
       console.log("Socio-economic development data saved:", data);
+      setExistingId(data.id); // Update existingId after successful POST
       onSubmit(payload);
       onClose();
     } catch (error) {
-      console.error("Error saving socio-economic development data:", error);
+      console.error("Error saving socio-economic development data:", error.message);
       alert(`Failed to save socio-economic development data: ${error.message}`);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm("Are you sure you want to delete all socio-economic development data for this user?")) {
+      return;
+    }
+
+    try {
+      console.log("Sending DELETE request for userId:", userId);
+      const response = await fetch(`http://localhost:5000/socio-economic-development/${userId}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("DELETE request failed:", { status: response.status, errorText });
+        throw new Error(`HTTP error! Status: ${response.status}: ${errorText}`);
+      }
+      console.log("Socio-economic development data deleted");
+      setBeneficiaries([]);
+      setSummary({
+        totalBeneficiaries: 0,
+        totalContributionAmount: 0,
+        averageBlackParticipation: 0,
+      });
+      setExistingId(null);
+      onSubmit(null);
+      onClose();
+    } catch (error) {
+      console.error("Error deleting socio-economic development data:", error.message);
+      alert(`Failed to delete socio-economic development data: ${error.message}`);
     }
   };
 
@@ -354,6 +410,15 @@ const SocioEconomicDevelopment = ({ userId, onClose, onSubmit }) => {
             >
               Cancel
             </button>
+            {userId && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700"
+              >
+                Delete Socio-Economic Development Details
+              </button>
+            )}
             <button
               type="submit"
               className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"

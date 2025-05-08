@@ -2063,30 +2063,32 @@ app.delete("/enterprise-development/:userId", async (req, res) => {
   }
 });
 
-// Socio-Economic Development - Create (unchanged)
+// Socio-Economic Development - Create
 app.post("/socio-economic-development", async (req, res) => {
   console.log("Socio-Economic Development POST hit with body:", req.body);
   const { userId, beneficiaries, summary } = req.body;
 
   try {
     if (!userId) {
-      console.log("Missing userId");
+      console.log("Validation failed: Missing userId");
       return res.status(400).json({ error: "User ID is required" });
     }
     if (!beneficiaries || !Array.isArray(beneficiaries)) {
-      console.log("Invalid beneficiaries data");
+      console.log("Validation failed: Beneficiaries is not an array or missing", { beneficiaries });
       return res.status(400).json({ error: "Beneficiaries must be an array" });
     }
     if (!summary || typeof summary !== "object") {
-      console.log("Invalid summary data");
+      console.log("Validation failed: Summary is not an object or missing", { summary });
       return res.status(400).json({ error: "Summary must be an object" });
     }
 
-    const userDoc = await getDoc(doc(db, "clients", userId));
-    if (!userDoc.exists()) {
+    console.log("Checking clients collection for userId:", userId);
+    const userDoc = await adminDb.collection("clients").doc(userId).get();
+    if (!userDoc.exists) {
       console.log("User not found for userId:", userId);
       return res.status(404).json({ error: "User not found" });
     }
+    console.log("User found in clients collection:", userDoc.data());
 
     const socioEconomicDevelopmentData = {
       userId,
@@ -2108,7 +2110,8 @@ app.post("/socio-economic-development", async (req, res) => {
       updatedAt: new Date().toISOString(),
     };
 
-    const docRef = await addDoc(collection(db, "socioEconomicDevelopment"), socioEconomicDevelopmentData);
+    const docRef = await adminDb.collection("socioEconomicDevelopment").add(socioEconomicDevelopmentData);
+    console.log("Write successful, doc ID:", docRef.id);
 
     res.status(201).json({
       message: "Socio-economic development data saved successfully",
@@ -2116,42 +2119,188 @@ app.post("/socio-economic-development", async (req, res) => {
       ...socioEconomicDevelopmentData,
     });
   } catch (error) {
-    console.error("Detailed error:", error);
+    console.error("Detailed error in POST /socio-economic-development:", {
+      message: error.message,
+      code: error.code,
+      stack: error.stack,
+      requestBody: req.body,
+    });
+    if (error.code === "permission-denied") {
+      return res.status(403).json({ error: "Permission denied accessing Firestore", code: error.code });
+    }
     res.status(400).json({ error: error.message, code: error.code });
   }
 });
 
-// Socio-Economic Development - Retrieve (unchanged)
+// Socio-Economic Development - Retrieve
 app.get("/socio-economic-development/:userId", async (req, res) => {
+  console.log("Socio-Economic Development GET hit with userId:", req.params.userId);
   const { userId } = req.params;
 
   try {
-    const socioEconomicRef = collection(db, "socioEconomicDevelopment");
-    const q = query(socioEconomicRef, where("userId", "==", userId));
-    const querySnapshot = await getDocs(q);
-
-    const socioEconomicRecords = [];
-    querySnapshot.forEach((doc) => {
-      socioEconomicRecords.push({
-        id: doc.id,
-        ...doc.data(),
-      });
-    });
-
-    if (socioEconomicRecords.length === 0) {
-      return res.status(404).json({ message: "No socio-economic development data found for this user" });
+    if (!userId) {
+      console.log("Missing userId in GET request");
+      return res.status(400).json({ error: "User ID is required" });
     }
 
+    console.log("Checking clients collection for userId:", userId);
+    const userDoc = await adminDb.collection("clients").doc(userId).get();
+    if (!userDoc.exists) {
+      console.log("User not found for userId:", userId);
+      return res.status(404).json({ error: "User not found" });
+    }
+    console.log("User found in clients collection:", userDoc.data());
+
+    const querySnapshot = await adminDb.collection("socioEconomicDevelopment").where("userId", "==", userId).get();
+    const socioEconomicRecords = querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
+    console.log("Socio-economic development data retrieved for userId:", userId, "Records:", socioEconomicRecords);
     res.status(200).json({
       message: "Socio-economic development data retrieved successfully",
       data: socioEconomicRecords,
     });
   } catch (error) {
-    console.error("Socio-economic development retrieval error:", error.code, error.message);
-    res.status(500).json({ error: error.message, code: error.code });
+    console.error("Detailed error in GET /socio-economic-development:", {
+      message: error.message,
+      code: error.code,
+      stack: error.stack,
+    });
+    if (error.code === "permission-denied") {
+      return res.status(403).json({ error: "Permission denied accessing Firestore", code: error.code });
+    }
+    res.status(500).json({ error: "Failed to retrieve socio-economic development data", code: error.code });
   }
 });
 
+// Socio-Economic Development - Update
+app.put("/socio-economic-development/:id", async (req, res) => {
+  console.log("Socio-Economic Development PUT hit with body:", req.body);
+  const { id } = req.params;
+  const { userId, beneficiaries, summary } = req.body;
+
+  try {
+    if (!userId) {
+      console.log("Validation failed: Missing userId");
+      return res.status(400).json({ error: "User ID is required" });
+    }
+    if (!beneficiaries || !Array.isArray(beneficiaries)) {
+      console.log("Validation failed: Beneficiaries is not an array or missing", { beneficiaries });
+      return res.status(400).json({ error: "Beneficiaries must be an array" });
+    }
+    if (!summary || typeof summary !== "object") {
+      console.log("Validation failed: Summary is not an object or missing", { summary });
+      return res.status(400).json({ error: "Summary must be an object" });
+    }
+
+    console.log("Checking clients collection for userId:", userId);
+    const userDoc = await adminDb.collection("clients").doc(userId).get();
+    if (!userDoc.exists) {
+      console.log("User not found for userId:", userId);
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const docRef = adminDb.collection("socioEconomicDevelopment").doc(id);
+    const existingDoc = await docRef.get();
+    if (!existingDoc.exists) {
+      console.log("Socio-economic development data not found for id:", id);
+      return res.status(404).json({ error: "Socio-economic development data not found" });
+    }
+
+    const socioEconomicDevelopmentData = {
+      userId,
+      beneficiaries: beneficiaries.map((beneficiary) => ({
+        beneficiaryName: beneficiary.beneficiaryName || "",
+        siteLocation: beneficiary.siteLocation || "",
+        blackParticipationPercentage: Number(beneficiary.blackParticipationPercentage) || 0,
+        contributionType: beneficiary.contributionType || "",
+        contributionDescription: beneficiary.contributionDescription || "",
+        dateOfContribution: beneficiary.dateOfContribution || "",
+        contributionAmount: Number(beneficiary.contributionAmount) || 0,
+      })),
+      summary: {
+        totalBeneficiaries: Number(summary.totalBeneficiaries) || 0,
+        totalContributionAmount: Number(summary.totalContributionAmount) || 0,
+        averageBlackParticipation: Number(summary.averageBlackParticipation) || 0,
+      },
+      updatedAt: new Date().toISOString(),
+    };
+
+    await docRef.update({
+      ...socioEconomicDevelopmentData,
+      createdAt: existingDoc.data().createdAt,
+    });
+
+    console.log("Socio-economic development data updated with ID:", id);
+    res.status(200).json({
+      message: "Socio-economic development data updated successfully",
+      id,
+      ...socioEconomicDevelopmentData,
+    });
+  } catch (error) {
+    console.error("Detailed error in PUT /socio-economic-development:", {
+      message: error.message,
+      code: error.code,
+      stack: error.stack,
+      requestBody: req.body,
+    });
+    if (error.code === "permission-denied") {
+      return res.status(403).json({ error: "Permission denied accessing Firestore", code: error.code });
+    }
+    res.status(400).json({ error: error.message, code: error.code });
+  }
+});
+
+// Socio-Economic Development - Delete
+app.delete("/socio-economic-development/:userId", async (req, res) => {
+  console.log("Socio-Economic Development DELETE hit with userId:", req.params.userId);
+  const { userId } = req.params;
+
+  try {
+    if (!userId) {
+      console.log("Missing userId in params");
+      return res.status(400).json({ error: "User ID is required" });
+    }
+
+    console.log("Checking clients collection for userId:", userId);
+    const userDoc = await adminDb.collection("clients").doc(userId).get();
+    if (!userDoc.exists) {
+      console.log("User not found for userId:", userId);
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const querySnapshot = await adminDb.collection("socioEconomicDevelopment").where("userId", "==", userId).get();
+    if (querySnapshot.empty) {
+      console.log("No socio-economic development data found for userId:", userId);
+      return res.status(404).json({ error: "No socio-economic development data found for this user" });
+    }
+
+    const deletePromises = [];
+    querySnapshot.docs.forEach((doc) => {
+      deletePromises.push(doc.ref.delete());
+    });
+
+    await Promise.all(deletePromises);
+
+    console.log("Socio-economic development data deleted for userId:", userId);
+    res.status(200).json({
+      message: "Socio-economic development data deleted successfully",
+      userId,
+    });
+  } catch (error) {
+    console.error("Detailed error in DELETE /socio-economic-development:", {
+      message: error.message,
+      code: error.code,
+      stack: error.stack,
+    });
+    if (error.code === "permission-denied") {
+      return res.status(403).json({ error: "Permission denied accessing Firestore", code: error.code });
+    }
+    res.status(500).json({ error: "Failed to delete socio-economic development data", code: error.code });
+  }
+});
 
 // Supplier Development - Retrieve
 app.get('/supplier-development/:userId', async (req, res) => {
