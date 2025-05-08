@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { FaBars, FaTimes } from 'react-icons/fa';
+import logo from '../assets/forge.png'
+
 
 const AdminNavBar = () => {
   const [email, setEmail] = useState('');
@@ -100,6 +102,12 @@ const AdminNavBar = () => {
             <FaTimes className="w-6 h-6" />
           </button>
           <h2 className="text-xl font-semibold mb-6">Menu</h2>
+                      <div className="flex justify-center mb-6">
+                        <Link to='/AdminDashboard'>
+                        <img src={logo} alt="Forge Logo" className="h-16" />
+                        </Link>
+                      </div>
+          
           <nav className="space-y-4">
             <Link
               to="/Clients"
