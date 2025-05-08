@@ -355,7 +355,6 @@ const OwnershipDetails = ({ userId, onClose, onSubmit }) => {
           }
         } catch (fetchError) {
           console.error('Error re-fetching data:', fetchError);
-          alert('Failed to restore data. Please refresh the page.');
         }
       } finally {
         setIsLoading(false);
