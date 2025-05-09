@@ -247,14 +247,13 @@ app.delete("/clients/:id", authenticateAdmin, async (req, res) => {
   console.log("Handling DELETE /clients/:id");
   const { id } = req.params;
   try {
-    await deleteDoc(doc(db, "clients", id));
+    await admin.firestore().collection('clients').doc(id).delete();
     res.status(200).json({ message: "Client deleted successfully" });
   } catch (error) {
     console.error("Error deleting client:", error);
     res.status(500).json({ error: "Failed to delete client" });
   }
 });
-
 
 // Get-profile endpoint
 app.get("/get-profile", authenticateAdmin, async (req, res) => {
