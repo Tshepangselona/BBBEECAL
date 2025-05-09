@@ -109,6 +109,153 @@ const authenticateAdmin = async (req, res, next) => {
   }
 };
 
+// CRUD Routes for Clients
+app.get("/clients", authenticateAdmin, async (req, res) => {
+  console.log("Handling GET /clients");
+  try {
+    const querySnapshot = await getDocs(collection(db, "clients"));
+    const clients = querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      businessName: doc.data().businessName,
+      businessEmail: doc.data().businessEmail,
+      contactNumber: doc.data().contactNumber,
+      financialYearEnd: doc.data().financialYearEnd.toDate().toISOString(),
+      status: doc.data().status || "Pending",
+      createdAt: doc.data().createdAt,
+    }));
+    console.log("Clients fetched:", clients.length);
+    res.status(200).json(clients);
+  } catch (error) {
+    console.error("Error fetching clients:", error);
+    res.status(500).json({ error: "Failed to fetch clients" });
+  }
+});
+
+app.post("/clients", authenticateAdmin, async (req, res) => {
+  console.log("Handling POST /clients");
+  const { businessName, businessEmail, contactNumber, financialYearEnd, address } = req.body;
+
+  if (!businessName || !businessEmail || !contactNumber || !financialYearEnd || !address) {
+    return res.status(400).json({ error: "All fields are required" });
+  }
+
+  try {
+    if (!validateDateFormat(financialYearEnd)) {
+      return res.status(400).json({ error: "Financial year end must be in DD/MMM/YYYY format" });
+    }
+
+    const [, day, monthStr, year] = financialYearEnd.match(/^(\d{2})\/([A-Za-z]{3})\/(\d{4})$/);
+    const month = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
+      .indexOf(monthStr.toLowerCase());
+    const dateObject = new Date(year, month, day);
+
+    if (isNaN(dateObject.getTime())) {
+      return res.status(400).json({ error: "Invalid financial year end date" });
+    }
+
+    const user = await admin.auth().createUser({ email: businessEmail, password: generatePassword() });
+    await setDoc(doc(db, "clients", user.uid), {
+      businessName,
+      businessEmail,
+      contactNumber,
+      financialYearEnd: dateObject,
+      address,
+      status: "Pending",
+      createdAt: new Date().toISOString(),
+    });
+
+    const resetLink = await admin.auth().generatePasswordResetLink(businessEmail);
+    const userEmail = new SibApiV3Sdk.SendSmtpEmail();
+    userEmail.sender = { name: 'Forge', email: process.env.ADMIN_EMAIL };
+    userEmail.to = [{ email: businessEmail }];
+    userEmail.subject = 'Welcome to Forge Academy';
+    userEmail.htmlContent = `
+      <html>
+        <body>
+          <p>Welcome, ${businessName}!</p>
+          <p>Your account has been created. Please set your password: <a href="${resetLink}">Set Password</a></p>
+          <p>Contact us at tebatsomoyaba@gmail.com for support.</p>
+        </body>
+      </html>
+    `;
+    await apiInstance.sendTransacEmail(userEmail);
+
+    res.status(201).json({
+      id: user.uid,
+      businessName,
+      businessEmail,
+      contactNumber,
+      financialYearEnd: dateObject.toISOString(),
+      status: "Pending",
+      createdAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Error creating client:", error);
+    res.status(500).json({ error: "Failed to create client" });
+  }
+});
+
+app.put("/clients/:id", authenticateAdmin, async (req, res) => {
+  console.log("Handling PUT /clients/:id");
+  const { id } = req.params;
+  const { businessName, businessEmail, contactNumber, financialYearEnd, address, status } = req.body;
+
+  if (!businessName || !businessEmail || !contactNumber || !financialYearEnd || !address) {
+    return res.status(400).json({ error: "All fields are required" });
+  }
+
+  try {
+    if (!validateDateFormat(financialYearEnd)) {
+      return res.status(400).json({ error: "Financial year end must be in DD/MMM/YYYY format" });
+    }
+
+    const [, day, monthStr, year] = financialYearEnd.match(/^(\d{2})\/([A-Za-z]{3})\/(\d{4})$/);
+    const month = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
+      .indexOf(monthStr.toLowerCase());
+    const dateObject = new Date(year, month, day);
+
+    if (isNaN(dateObject.getTime())) {
+      return res.status(400).json({ error: "Invalid financial year end date" });
+    }
+
+    const clientRef = doc(db, "clients", id);
+    await updateDoc(clientRef, {
+      businessName,
+      businessEmail,
+      contactNumber,
+      financialYearEnd: dateObject,
+      address,
+      status: status || "Pending",
+      updatedAt: new Date().toISOString(),
+    });
+
+    res.status(200).json({
+      id,
+      businessName,
+      businessEmail,
+      contactNumber,
+      financialYearEnd: dateObject.toISOString(),
+      status: status || "Pending",
+    });
+  } catch (error) {
+    console.error("Error updating client:", error);
+    res.status(500).json({ error: "Failed to update client" });
+  }
+});
+
+app.delete("/clients/:id", authenticateAdmin, async (req, res) => {
+  console.log("Handling DELETE /clients/:id");
+  const { id } = req.params;
+  try {
+    await deleteDoc(doc(db, "clients", id));
+    res.status(200).json({ message: "Client deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting client:", error);
+    res.status(500).json({ error: "Failed to delete client" });
+  }
+});
+
+
 // Get-profile endpoint
 app.get("/get-profile", authenticateAdmin, async (req, res) => {
   const { uid } = req.query;
