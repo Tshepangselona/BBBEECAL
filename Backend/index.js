@@ -218,12 +218,12 @@ app.put("/clients/:id", authenticateAdmin, async (req, res) => {
       return res.status(400).json({ error: "Invalid financial year end date" });
     }
 
-    const clientRef = doc(db, "clients", id);
-    await updateDoc(clientRef, {
+    const clientRef = adminDb.collection("clients").doc(id);
+    await clientRef.update({
       businessName,
       businessEmail,
       contactNumber,
-      financialYearEnd: dateObject,
+      financialYearEnd: admin.firestore.Timestamp.fromDate(dateObject),
       address,
       status: status || "Pending",
       updatedAt: new Date().toISOString(),

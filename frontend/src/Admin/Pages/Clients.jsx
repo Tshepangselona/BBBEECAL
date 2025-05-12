@@ -283,10 +283,12 @@ const Clients = () => {
       setSelectedClient(null);
     } catch (error) {
       console.error('Error saving client:', error);
-      setError(error.message);
+      setError(error.message === 'No authentication token found' 
+        ? 'Please log in to save clients' 
+        : error.message || 'Failed to save client. Please try again.');
     }
   };
-
+  
   // Handle delete
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this client?')) {
