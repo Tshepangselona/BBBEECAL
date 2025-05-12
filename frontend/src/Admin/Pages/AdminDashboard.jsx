@@ -14,17 +14,6 @@ const apiService = {
     }
     return response.json();
   },
-
-  async fetchManagementControl(token, userId) {
-    const response = await fetch(`http://localhost:5000/management-control/${userId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to fetch management control data');
-    }
-    return response.json();
-  },
 };
 
 const AdminDashboard = () => {
@@ -46,33 +35,21 @@ const AdminDashboard = () => {
 
         // Fetch clients
         const clients = await apiService.fetchClients(token);
+        console.log('Fetched clients:', clients.map(c => ({
+          id: c.id,
+          businessName: c.businessName,
+          status: c.status,
+          createdAt: c.createdAt
+        })));
 
-        // Calculate totalClients and pendingActions
+        // Calculate stats
         const totalClients = clients.length;
+        const activeChats = clients.filter(
+          (client) => client.status === 'Active'
+        ).length;
         const pendingActions = clients.filter(
           (client) => client.status === 'Pending'
         ).length;
-
-        // Calculate activeChats
-        let activeChats = 0;
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-        for (const client of clients) {
-          try {
-            const managementData = await apiService.fetchManagementControl(token, client.id);
-            if (managementData.data && managementData.data.length > 0) {
-              const hasRecentActivity = managementData.data.some(
-                (entry) =>
-                  entry.updatedAt &&
-                  new Date(entry.updatedAt) >= thirtyDaysAgo
-              );
-              if (hasRecentActivity) activeChats += 1;
-            }
-          } catch (error) {
-            console.warn(`No management control data for client ${client.id}:`, error.message);
-          }
-        }
 
         // Calculate growthRate
         const now = new Date();
@@ -97,10 +74,16 @@ const AdminDashboard = () => {
 
         let growthRate;
         if (previousMonthClients === 0) {
-          growthRate = currentMonthClients > 0 ? 100 : 0; // 100% if new clients, 0% if none
+          growthRate = currentMonthClients > 0 ? 100 : 0;
         } else {
           growthRate = ((currentMonthClients - previousMonthClients) / previousMonthClients) * 100;
         }
+
+        console.log(`Stats calculated:`);
+        console.log(`- Total Clients: ${totalClients}`);
+        console.log(`- Active Chats: ${activeChats} (clients with status 'Active')`);
+        console.log(`- Pending Actions: ${pendingActions} (clients with status 'Pending')`);
+        console.log(`- Growth Rate: ${growthRate.toFixed(1)}% (current: ${currentMonthClients}, previous: ${previousMonthClients})`);
 
         setStats({
           totalClients,
