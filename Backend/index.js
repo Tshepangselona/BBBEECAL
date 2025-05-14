@@ -109,6 +109,89 @@ const authenticateAdmin = async (req, res, next) => {
   }
 };
 
+app.post("/refresh-token", async (req, res) => {
+  const { uid } = req.body;
+  const idToken = req.headers.authorization?.split("Bearer ")[1];
+  console.log("Refresh token request for UID:", uid);
+
+  try {
+    if (!idToken || !uid) {
+      console.log("Missing idToken or uid");
+      return res.status(400).json({ error: "idToken and uid are required" });
+    }
+
+    // Verify the current idToken
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    if (decodedToken.uid !== uid) {
+      console.log("UID mismatch in token refresh", { tokenUid: decodedToken.uid, providedUid: uid });
+      return res.status(401).json({ error: "Invalid token or UID mismatch" });
+    }
+
+    // Generate a new idToken
+    const newIdToken = await admin.auth().createCustomToken(uid);
+    console.log("New idToken generated for UID:", uid);
+
+    res.json({ idToken: newIdToken });
+  } catch (error) {
+    console.error("Token refresh error:", {
+      code: error.code,
+      message: error.message,
+    });
+    res.status(401).json({ error: "Failed to refresh token", code: error.code });
+  }
+});
+
+const authenticateUser = async (req, res, next) => {
+  const idToken = req.headers.authorization?.split("Bearer ")[1];
+  console.log("Authenticating user with idToken:", idToken ? "Provided" : "Missing");
+
+  if (!idToken) {
+    console.log("No idToken provided in Authorization header");
+    return res.status(401).json({ error: "No authentication token provided" });
+  }
+
+  try {
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    console.log("Token verified, UID:", decodedToken.uid);
+    req.user = decodedToken; // Attach decoded token to request
+    next();
+  } catch (error) {
+    console.error("Token verification error:", {
+      code: error.code,
+      message: error.message,
+    });
+    return res.status(401).json({ error: "Invalid or expired token", code: error.code });
+  }
+};
+
+module.exports = authenticateUser;
+
+app.post("/refresh-token", async (req, res) => {
+  const { uid } = req.body;
+  const idToken = req.headers.authorization?.split("Bearer ")[1];
+
+  try {
+    if (!idToken || !uid) {
+      return res.status(400).json({ error: "idToken and uid are required" });
+    }
+
+    // Verify the current idToken
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    if (decodedToken.uid !== uid) {
+      return res.status(401).json({ error: "Invalid token or UID mismatch" });
+    }
+
+    // Generate a new idToken (Firebase doesn't directly "refresh" tokens, so we create a custom token)
+    const newIdToken = await admin.auth().createCustomToken(uid);
+    console.log("New idToken generated for UID:", uid);
+
+    res.json({ idToken: newIdToken });
+  } catch (error) {
+    console.error("Token refresh error:", error);
+    res.status(401).json({ error: "Failed to refresh token", code: error.code });
+  }
+});
+
 // CRUD Routes for Clients
 app.get("/clients", authenticateAdmin, async (req, res) => {
   console.log("Handling GET /clients");
@@ -256,14 +339,20 @@ app.delete("/clients/:id", authenticateAdmin, async (req, res) => {
 });
 
 // Get-profile endpoint
-app.get("/get-profile", authenticateAdmin, async (req, res) => {
+app.get("/get-profile", authenticateUser, async (req, res) => {
   const { uid } = req.query;
-  console.log("Get profile request for UID:", uid, "by admin UID:", req.user.uid);
+  console.log("Get profile request for UID:", uid, "by authenticated UID:", req.user.uid);
 
   try {
     if (!uid) {
       console.log("Missing UID in request");
       return res.status(400).json({ error: "User ID is required" });
+    }
+
+    // Ensure the requested UID matches the authenticated user's UID
+    if (uid !== req.user.uid) {
+      console.log("Unauthorized: UID mismatch", { requested: uid, authenticated: req.user.uid });
+      return res.status(403).json({ error: "Unauthorized: You can only access your own profile" });
     }
 
     if (!db) {
@@ -302,7 +391,6 @@ app.get("/get-profile", authenticateAdmin, async (req, res) => {
     });
   }
 });
-
 // Verify admin status
 app.get("/verify-admin", async (req, res) => {
   const authHeader = req.headers.authorization;
@@ -726,6 +814,7 @@ app.patch("/update-profile", async (req, res) => {
     res.status(500).json({ error: "Failed to update profile", code: error.code });
   }
 });
+
 // Login route (for clients)
 app.post("/login", async (req, res) => {
   const { businessEmail, password } = req.body;
@@ -743,6 +832,10 @@ app.post("/login", async (req, res) => {
     const userCredential = await signInWithEmailAndPassword(auth, businessEmail, password);
     const user = userCredential.user;
     console.log("Firebase client login successful, UID:", user.uid);
+
+    // Get the idToken
+    const idToken = await user.getIdToken();
+    console.log("idToken generated:", idToken);
 
     // Check for admin user to prevent admin login
     console.log("Checking if user is an admin...");
@@ -765,6 +858,7 @@ app.post("/login", async (req, res) => {
     return res.status(200).json({
       message: "Client login successful",
       uid: user.uid,
+      idToken, // Include idToken in response
       businessName: clientData.businessName,
       businessEmail: clientData.businessEmail,
       financialYearEnd: clientData.financialYearEnd,
@@ -781,7 +875,6 @@ app.post("/login", async (req, res) => {
     return res.status(500).json({ error: "Something went wrong", code: error.code });
   }
 });
-
 // Test route (unchanged)
 app.get('/test', (req, res) => {
   res.status(200).json({ message: 'Test route working' });

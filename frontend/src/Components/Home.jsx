@@ -82,34 +82,41 @@ const Home = () => {
   };
 
   // Fetch user profile from backend
-  const fetchUserProfile = async (uid) => {
-    try {
-      console.log("Fetching profile for UID:", uid);
-      const response = await fetch(`http://localhost:5000/get-profile?uid=${uid}`);
-      console.log("Fetch response status:", response.status, "OK:", response.ok);
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`Failed to fetch profile: ${response.status} ${response.statusText}, ${errorData.error || "Unknown error"}`);
-      }
-      const data = await response.json();
-      console.log("Profile data received:", data);
-      setFinancialData((prevData) => ({
-        ...prevData,
-        companyName: data.businessName || prevData.companyName,
-        yearEnd: data.financialYearEnd ? formatDate(data.financialYearEnd) : prevData.yearEnd,
-        sector: data.sector || prevData.sector,
-      }));
-      setOriginalData({
-        companyName: data.businessName || financialData.companyName,
-        sector: data.sector || financialData.sector,
-      });
-    } catch (err) {
-      console.error("Fetch profile error:", err.message);
-      setError(`Failed to fetch profile data: ${err.message}`);
+const fetchUserProfile = async (uid) => {
+  try {
+    console.log("Fetching profile for UID:", uid);
+    const idToken = localStorage.getItem("idToken");
+    console.log("idToken from localStorage:", idToken);
+    if (!idToken) {
+      throw new Error("No authentication token found. Please log in again.");
     }
-  };
-
-  // Save profile changes to backend
+    const response = await fetch(`http://localhost:5000/get-profile?uid=${uid}`, {
+      headers: {
+        Authorization: `Bearer ${idToken}`,
+      },
+    });
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Failed to fetch profile: ${response.status} ${response.statusText}, ${errorData.error || "Unknown error"}`);
+    }
+    const data = await response.json();
+    console.log("Profile data received:", data);
+    setFinancialData((prevData) => ({
+      ...prevData,
+      companyName: data.businessName || prevData.companyName,
+      yearEnd: data.financialYearEnd ? formatDate(data.financialYearEnd) : prevData.yearEnd,
+      sector: data.sector || prevData.sector,
+    }));
+    setOriginalData({
+      companyName: data.businessName || financialData.companyName,
+      sector: data.sector || financialData.sector,
+    });
+  } catch (err) {
+    console.error("Fetch profile error:", err.message);
+    setError(`Failed to fetch profile data: ${err.message}`);
+  }
+};
+// Save profile changes to backend
   const handleSave = async () => {
     try {
       const payload = {
@@ -143,50 +150,87 @@ const Home = () => {
   };
 
   // Initialize user data
-  useEffect(() => {
-    const userData = location.state?.userData;
-    console.log("Raw userData:", userData);
+useEffect(() => {
+const userData = location.state?.userData;
+  console.log("Raw userData:", userData);
 
-    if (!userData || !userData.uid) {
-      console.log("No user data or UID found, redirecting to Login");
-      setError("User data not provided. Please log in.");
-      setLoading(false);
-      navigate("/Login", { replace: true });
-      return;
-    }
+  const idToken = localStorage.getItem("idToken");
+  const storedUid = localStorage.getItem("uid");
 
-    const initializeData = async () => {
-      try {
-        setUserId(userData.uid);
-        const formattedYearEnd = userData.financialYearEnd
-          ? formatDate(userData.financialYearEnd)
-          : "";
-        const initialData = {
-          companyName: userData.businessName || '',
-          yearEnd: formattedYearEnd || '',
-          sector: userData.sector || '',
-        };
-        console.log("Initial data set:", initialData);
-        setFinancialData((prevData) => ({
-          ...prevData,
-          ...initialData,
-        }));
-        setOriginalData({ companyName: initialData.companyName, sector: initialData.sector });
+  if (!userData || !userData.uid || !idToken || !storedUid) {
+    console.log("Missing userData, uid, idToken, or storedUid, redirecting to Login");
+    setError("Please log in to continue.");
+    setLoading(false);
+    navigate("/Login", { replace: true });
+    return;
+  }
 
-        // Fetch profile data from backend
-        await fetchUserProfile(userData.uid);
-      } catch (err) {
-        console.error("Error processing data:", err);
-        setError("Failed to load company data");
-      } finally {
-        setLoading(false);
+  // Function to refresh token
+  const refreshToken = async () => {
+    try {
+      const uid = localStorage.getItem("uid");
+      const idToken = localStorage.getItem("idToken");
+      if (!uid || !idToken) {
+        throw new Error("No UID or token found");
       }
-    };
+      const res = await fetch("http://localhost:5000/refresh-token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ uid }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to refresh token");
+      }
+      localStorage.setItem("idToken", data.idToken);
+      console.log("Token refreshed for UID:", uid);
+    } catch (err) {
+      console.error("Token refresh error:", err.message);
+      localStorage.removeItem("idToken");
+      localStorage.removeItem("uid");
+      navigate("/Login", { replace: true });
+    }
+  };
 
-    initializeData();
-  }, [location, navigate]);
+  // Refresh token every 50 minutes (tokens expire in 1 hour)
+  const tokenRefreshInterval = setInterval(refreshToken, 50 * 60 * 1000);
 
-  const handleInputChange = (e) => {
+  const initializeData = async () => {
+    try {
+      setUserId(userData.uid);
+      const formattedYearEnd = userData.financialYearEnd
+        ? formatDate(userData.financialYearEnd)
+        : "";
+      const initialData = {
+        companyName: userData.businessName || "",
+        yearEnd: formattedYearEnd || "",
+        sector: userData.sector || "",
+      };
+      console.log("Initial data set:", initialData);
+      setFinancialData((prevData) => ({
+        ...prevData,
+        ...initialData,
+      }));
+      setOriginalData({ companyName: initialData.companyName, sector: initialData.sector });
+
+      await fetchUserProfile(userData.uid);
+    } catch (err) {
+      console.error("Error processing data:", err);
+      setError("Failed to load company data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  initializeData();
+
+  return () => clearInterval(tokenRefreshInterval); // Cleanup
+}, [location, navigate]);
+
+const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFinancialData((prevData) => {
       const newData = {
