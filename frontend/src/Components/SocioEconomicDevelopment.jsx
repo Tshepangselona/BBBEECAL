@@ -30,7 +30,7 @@ const SocioEconomicDevelopment = ({ userId, onClose, onSubmit }) => {
           console.error("GET request failed:", { status: response.status, errorText });
           if (response.status === 404) {
             console.log("No data found for userId, proceeding with empty form");
-            return; // Allow form to load
+            return;
           }
           throw new Error(`HTTP error! Status: ${response.status}`);
         }
@@ -53,6 +53,85 @@ const SocioEconomicDevelopment = ({ userId, onClose, onSubmit }) => {
     setNewBeneficiary({
       ...newBeneficiary,
       [name]: type === "number" ? (value === "" ? 0 : Number(value)) : value,
+    });
+  };
+
+  const handleCSVUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.csv')) {
+      alert('Please upload a CSV file');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target.result;
+      try {
+        const parsedData = parseCSV(text);
+        const validatedData = validateCSVData(parsedData);
+        const updatedBeneficiaries = [...beneficiaries, ...validatedData];
+        setBeneficiaries(updatedBeneficiaries);
+        recalculateSummary(updatedBeneficiaries);
+      } catch (error) {
+        alert(`Error processing CSV file: ${error.message}`);
+      }
+    };
+    reader.onerror = () => {
+      alert('Error reading the CSV file');
+    };
+    reader.readAsText(file);
+  };
+
+  const parseCSV = (text) => {
+    const lines = text.split('\n').filter(line => line.trim() !== '');
+    if (lines.length === 0) throw new Error('Empty CSV file');
+
+    const headers = lines[0].split(',').map(header => header.trim().toLowerCase());
+    const requiredHeaders = [
+      'beneficiaryname', 
+      'sitelocation', 
+      'blackparticipationpercentage', 
+      'contributiontype', 
+      'contributiondescription', 
+      'dateofcontribution', 
+      'contributionamount'
+    ];
+
+    if (!requiredHeaders.every(header => headers.includes(header))) {
+      throw new Error('CSV file must contain all required headers: ' + requiredHeaders.join(', '));
+    }
+
+    return lines.slice(1).map(line => {
+      const values = line.split(',').map(val => val.trim());
+      const obj = {};
+      headers.forEach((header, index) => {
+        obj[header] = values[index] || '';
+      });
+      return {
+        beneficiaryName: obj.beneficiaryname,
+        siteLocation: obj.sitelocation,
+        blackParticipationPercentage: Number(obj.blackparticipationpercentage) || 0,
+        contributionType: obj.contributiontype,
+        contributionDescription: obj.contributiondescription,
+        dateOfContribution: obj.dateofcontribution,
+        contributionAmount: Number(obj.contributionamount) || 0,
+      };
+    });
+  };
+
+  const validateCSVData = (data) => {
+    return data.filter(item => {
+      if (!item.beneficiaryName || !item.contributionType || !item.contributionAmount) {
+        console.warn('Skipping invalid CSV row:', item);
+        return false;
+      }
+      if (item.blackParticipationPercentage < 0 || item.blackParticipationPercentage > 100) {
+        console.warn('Invalid black participation percentage:', item);
+        return false;
+      }
+      return true;
     });
   };
 
@@ -161,7 +240,7 @@ const SocioEconomicDevelopment = ({ userId, onClose, onSubmit }) => {
       }
       const data = await response.json();
       console.log("Socio-economic development data saved:", data);
-      setExistingId(data.id); // Update existingId after successful POST
+      setExistingId(data.id);
       onSubmit(payload);
       onClose();
     } catch (error) {
@@ -207,6 +286,21 @@ const SocioEconomicDevelopment = ({ userId, onClose, onSubmit }) => {
         <h2 className="text-xl font-semibold mb-4">Socio-Economic Development Details</h2>
 
         <form onSubmit={handleSubmit}>
+          {/* CSV Upload Section */}
+          <div className="mb-6">
+            <h3 className="text-lg font-medium mb-2">Upload Beneficiaries CSV</h3>
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleCSVUpload}
+              className="w-full p-2 border rounded"
+            />
+            <p className="text-sm text-gray-600 mt-2">
+              CSV file must contain headers: beneficiaryName, siteLocation, blackParticipationPercentage, 
+              contributionType, contributionDescription, dateOfContribution, contributionAmount
+            </p>
+          </div>
+
           {/* Beneficiary Input Form */}
           <div className="mb-6">
             <h3 className="text-lg font-medium mb-2">Add Beneficiary</h3>
