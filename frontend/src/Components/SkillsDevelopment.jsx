@@ -138,7 +138,114 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
     if (name === 'costToCompanySalary') return;
     setNewTraining({
       ...newTraining,
-      [name]: type === 'checkbox' ? checked : type === 'number' ? Number(value) : value,
+      [name]: type === 'checkbox' ? checked : type === 'number' ? (value === '' ? 0 : Number(value)) : value,
+    });
+  };
+
+  const handleCSVUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.csv')) {
+      alert('Please upload a CSV file');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target.result;
+      try {
+        const parsedData = parseCSV(text);
+        const validatedData = validateCSVData(parsedData);
+        const updatedTrainings = [...trainings, ...validatedData];
+        setTrainings(updatedTrainings);
+        recalculateSummary(updatedTrainings);
+      } catch (error) {
+        alert(`Error processing CSV file: ${error.message}`);
+      }
+    };
+    reader.onerror = () => {
+      alert('Error reading the CSV file');
+    };
+    reader.readAsText(file);
+  };
+
+  const parseCSV = (text) => {
+    const lines = text.split('\n').filter(line => line.trim() !== '');
+    if (lines.length === 0) throw new Error('Empty CSV file');
+
+    const headers = lines[0].split(',').map(header => header.trim().toLowerCase());
+    const requiredHeaders = [
+      'startdate',
+      'enddate',
+      'trainingcourse',
+      'trainerprovider',
+      'category',
+      'learnername',
+      'sitelocation',
+      'idnumber',
+      'race',
+      'gender',
+      'isdisabled',
+      'corecriticalskills',
+      'totaldirectexpenditure',
+      'additionalexpenditure',
+      'costtocompanysalary',
+      'trainingdurationhours',
+      'numberofparticipants',
+      'isunemployedlearner',
+      'isabsorbedinternaltrainer'
+    ];
+
+    if (!requiredHeaders.every(header => headers.includes(header))) {
+      throw new Error('CSV file must contain all required headers: ' + requiredHeaders.join(', '));
+    }
+
+    return lines.slice(1).map(line => {
+      const values = line.split(',').map(val => val.trim());
+      const obj = {};
+      headers.forEach((header, index) => {
+        obj[header] = values[index] || '';
+      });
+      return {
+        startDate: obj.startdate,
+        endDate: obj.enddate,
+        trainingCourse: obj.trainingcourse,
+        trainerProvider: obj.trainerprovider,
+        category: obj.category,
+        learnerName: obj.learnername,
+        siteLocation: obj.sitelocation,
+        idNumber: obj.idnumber,
+        race: obj.race,
+        gender: obj.gender,
+        isDisabled: obj.isdisabled.toLowerCase() === 'true',
+        coreCriticalSkills: obj.corecriticalskills,
+        totalDirectExpenditure: Number(obj.totaldirectexpenditure) || 0,
+        additionalExpenditure: Number(obj.additionalexpenditure) || 0,
+        costToCompanySalary: Number(obj.costtocompanysalary) || 0,
+        trainingDurationHours: Number(obj.trainingdurationhours) || 0,
+        numberOfParticipants: Number(obj.numberofparticipants) || 0,
+        isUnemployedLearner: obj.isunemployedlearner.toLowerCase() === 'true',
+        isAbsorbedInternalTrainer: obj.isabsorbedinternaltrainer.toLowerCase() === 'true',
+      };
+    });
+  };
+
+  const validateCSVData = (data) => {
+    return data.filter(item => {
+      if (!item.startDate || !item.trainingCourse || !item.learnerName || !item.idNumber || !item.category) {
+        console.warn('Skipping invalid CSV row:', item);
+        return false;
+      }
+      if (item.totalDirectExpenditure < 0 || item.additionalExpenditure < 0 || item.costToCompanySalary < 0 || item.trainingDurationHours < 0 || item.numberOfParticipants < 0) {
+        console.warn('Invalid numerical value in CSV row:', item);
+        return false;
+      }
+      if (trainings.some(training => training.idNumber === item.idNumber)) {
+        console.warn('Duplicate ID number in CSV row:', item);
+        return false;
+      }
+      return true;
     });
   };
 
@@ -329,7 +436,6 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
 
     setIsLoading(true);
     try {
-      // Check for existing data, handle 404s like OwnershipDetails/Yes4YouthInitiative
       let method = 'post';
       let url = 'http://localhost:5000/skills-development';
       let existingId = null;
@@ -348,9 +454,8 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
             return;
           }
           console.warn('No existing skills development data found for userId:', userId);
-          // Proceed with POST for new data
         } else {
-          throw checkError; // Re-throw other errors
+          throw checkError;
         }
       }
 
@@ -454,6 +559,24 @@ const SkillsDevelopment = ({ userId, onClose, onSubmit }) => {
         <h2 className="text-xl font-semibold mb-4">Skills Development Details</h2>
 
         <form onSubmit={handleSubmit}>
+          {/* CSV Upload Section */}
+          <div className="mb-6">
+            <h3 className="text-lg font-medium mb-2">Upload Training Programs CSV</h3>
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleCSVUpload}
+              className="w-full p-2 border rounded"
+              disabled={isLoading}
+            />
+            <p className="text-sm text-gray-600 mt-2">
+              CSV file must contain headers: startDate, endDate, trainingCourse, trainerProvider, category,
+              learnerName, siteLocation, idNumber, race, gender, isDisabled, coreCriticalSkills,
+              totalDirectExpenditure, additionalExpenditure, costToCompanySalary, trainingDurationHours,
+              numberOfParticipants, isUnemployedLearner, isAbsorbedInternalTrainer
+            </p>
+          </div>
+
           <div className="mb-6">
             <h3 className="text-lg font-medium mb-2">Add Training Program</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
