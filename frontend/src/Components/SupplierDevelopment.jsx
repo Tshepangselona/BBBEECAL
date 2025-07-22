@@ -152,6 +152,173 @@ const SupplierDevelopment = ({ userId, onClose, onSubmit, onLogout }) => {
     });
   };
 
+  const handleLocalSupplierCSVUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.csv')) {
+      alert('Please upload a CSV file');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target.result;
+      try {
+        const parsedData = parseLocalSupplierCSV(text);
+        const validatedData = validateLocalSupplierCSVData(parsedData);
+        const updatedSuppliers = [...localSuppliers, ...validatedData];
+        setLocalSuppliers(updatedSuppliers);
+        recalculateLocalSummary(updatedSuppliers);
+      } catch (error) {
+        alert(`Error processing local supplier CSV file: ${error.message}`);
+      }
+    };
+    reader.onerror = () => {
+      alert('Error reading the local supplier CSV file');
+    };
+    reader.readAsText(file);
+  };
+
+  const parseLocalSupplierCSV = (text) => {
+    const lines = text.split('\n').filter(line => line.trim() !== '');
+    if (lines.length === 0) throw new Error('Empty CSV file');
+
+    const headers = lines[0].split(',').map(header => header.trim().toLowerCase());
+    const requiredHeaders = [
+      'suppliername',
+      'sitelocation',
+      'regno',
+      'vatno',
+      'expenditure',
+      'supplierclassification',
+      'beelevel',
+      'is30percentblackowned',
+      'is51percentblackowned',
+      'is30percentblackwomanowned',
+      'blackownedpercentage',
+      'blackwomanownedpercentage',
+      'isesdrecipient',
+      'beecertificateexpirydate'
+    ];
+
+    if (!requiredHeaders.every(header => headers.includes(header))) {
+      throw new Error('Local supplier CSV file must contain all required headers: ' + requiredHeaders.join(', '));
+    }
+
+    return lines.slice(1).map(line => {
+      const values = line.split(',').map(val => val.trim());
+      const obj = {};
+      headers.forEach((header, index) => {
+        obj[header] = values[index] || '';
+      });
+      return {
+        supplierName: obj.suppliername,
+        siteLocation: obj.sitelocation,
+        regNo: obj.regno,
+        vatNo: obj.vatno,
+        expenditure: Number(obj.expenditure) || 0,
+        supplierClassification: obj.supplierclassification,
+        beeLevel: obj.beelevel,
+        is30PercentBlackOwned: obj.is30percentblackowned.toLowerCase() === 'true',
+        is51PercentBlackOwned: obj.is51percentblackowned.toLowerCase() === 'true',
+        is30PercentBlackWomanOwned: obj.is30percentblackwomanowned.toLowerCase() === 'true',
+        blackOwnedPercentage: Number(obj.blackownedpercentage) || 0,
+        blackWomanOwnedPercentage: Number(obj.blackwomanownedpercentage) || 0,
+        isESDRecipient: obj.isesdrecipient.toLowerCase() === 'true',
+        beeCertificateExpiryDate: obj.beecertificateexpirydate,
+      };
+    });
+  };
+
+  const validateLocalSupplierCSVData = (data) => {
+    return data.filter(item => {
+      if (!item.supplierName.trim() || item.expenditure <= 0 || !item.supplierClassification.trim()) {
+        console.warn('Skipping invalid local supplier CSV row:', item);
+        return false;
+      }
+      if (item.blackOwnedPercentage < 0 || item.blackOwnedPercentage > 100 || 
+          item.blackWomanOwnedPercentage < 0 || item.blackWomanOwnedPercentage > 100) {
+        console.warn('Invalid percentage value in local supplier CSV row:', item);
+        return false;
+      }
+      return true;
+    });
+  };
+
+  const handleImportCSVUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.csv')) {
+      alert('Please upload a CSV file');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target.result;
+      try {
+        const parsedData = parseImportCSV(text);
+        const validatedData = validateImportCSVData(parsedData);
+        const updatedImports = [...imports, ...validatedData];
+        setImports(updatedImports);
+        recalculateImportSummary(updatedImports);
+      } catch (error) {
+        alert(`Error processing import CSV file: ${error.message}`);
+      }
+    };
+    reader.onerror = () => {
+      alert('Error reading the import CSV file');
+    };
+    reader.readAsText(file);
+  };
+
+  const parseImportCSV = (text) => {
+    const lines = text.split('\n').filter(line => line.trim() !== '');
+    if (lines.length === 0) throw new Error('Empty CSV file');
+
+    const headers = lines[0].split(',').map(header => header.trim().toLowerCase());
+    const requiredHeaders = [
+      'foreignsuppliername',
+      'sitelocation',
+      'goodsservices',
+      'expenditure',
+      'reasonforimport',
+      'esdplan'
+    ];
+
+    if (!requiredHeaders.every(header => headers.includes(header))) {
+      throw new Error('Import CSV file must contain all required headers: ' + requiredHeaders.join(', '));
+    }
+
+    return lines.slice(1).map(line => {
+      const values = line.split(',').map(val => val.trim());
+      const obj = {};
+      headers.forEach((header, index) => {
+        obj[header] = values[index] || '';
+      });
+      return {
+        foreignSupplierName: obj.foreignsuppliername,
+        siteLocation: obj.sitelocation,
+        goodsServices: obj.goodsservices,
+        expenditure: Number(obj.expenditure) || 0,
+        reasonForImport: obj.reasonforimport,
+        esdPlan: obj.esdplan,
+      };
+    });
+  };
+
+  const validateImportCSVData = (data) => {
+    return data.filter(item => {
+      if (!item.foreignSupplierName.trim() || item.expenditure <= 0 || !item.goodsServices.trim()) {
+        console.warn('Skipping invalid import CSV row:', item);
+        return false;
+      }
+      return true;
+    });
+  };
+
   const addLocalSupplier = () => {
     if (!userId) {
       console.warn('addLocalSupplier: userId is missing');
@@ -465,7 +632,6 @@ const SupplierDevelopment = ({ userId, onClose, onSubmit, onLogout }) => {
       return;
     }
 
-    // Check if there is at least one local supplier or import
     if (localSuppliers.length === 0 && imports.length === 0) {
       alert('Please add at least one local supplier or import before submitting.');
       return;
@@ -603,6 +769,24 @@ const SupplierDevelopment = ({ userId, onClose, onSubmit, onLogout }) => {
         <h2 className="text-xl font-semibold mb-4">Supplier Development & Imports</h2>
 
         <form onSubmit={handleSubmit}>
+          {/* Local Suppliers CSV Upload */}
+          <div className="mb-8">
+            <h3 className="text-lg font-medium mb-2">Upload Local Suppliers CSV</h3>
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleLocalSupplierCSVUpload}
+              className="w-full p-2 border rounded"
+              disabled={isLoading}
+            />
+            <p className="text-sm text-gray-600 mt-2">
+              CSV file must contain headers: supplierName, siteLocation, regNo, vatNo, expenditure,
+              supplierClassification, beeLevel, is30PercentBlackOwned, is51PercentBlackOwned,
+              is30PercentBlackWomanOwned, blackOwnedPercentage, blackWomanOwnedPercentage,
+              isESDRecipient, beeCertificateExpiryDate
+            </p>
+          </div>
+
           {/* Local Suppliers Form */}
           <div className="mb-8">
             <h3 className="text-lg font-medium mb-2">Add Local Supplier</h3>
@@ -913,6 +1097,22 @@ const SupplierDevelopment = ({ userId, onClose, onSubmit, onLogout }) => {
                 />
               </div>
             </div>
+          </div>
+
+          {/* Imports CSV Upload */}
+          <div className="mb-8">
+            <h3 className="text-lg font-medium mb-2">Upload Imports CSV</h3>
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleImportCSVUpload}
+              className="w-full p-2 border rounded"
+              disabled={isLoading}
+            />
+            <p className="text-sm text-gray-600 mt-2">
+              CSV file must contain headers: foreignSupplierName, siteLocation, goodsServices,
+              expenditure, reasonForImport, esdPlan
+            </p>
           </div>
 
           {/* Imports Form */}
