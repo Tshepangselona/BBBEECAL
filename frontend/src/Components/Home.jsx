@@ -9,7 +9,7 @@ import SupplierDevelopment from "./SupplierDevelopment";
 import EnterpriseDevelopment from './EnterpriseDevelopment';
 import SocioEconomicDevelopment from "./SocioEconomicDevelopment";
 import Results from './Results';
-import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/solid';
+import { Bars3Icon, XMarkIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/solid';
 
 const Home = () => {
   const location = useLocation();
@@ -402,7 +402,7 @@ const Home = () => {
 
     if (supplierDevelopmentDetails?.localSummary) {
       const totalProcurementSpend = financialData.totalMeasuredProcurementSpend || 1;
-      const blackOwnedSpend = supplierDevelopmentDetails.localSummary.totalExpenditure * 
+      const blackOwnedSpend = supplierDevelopmentDetails.localSummary.totalExpenditure *
         (supplierDevelopmentDetails.localSummary.blackOwnedSuppliers / (supplierDevelopmentDetails.localSummary.totalSuppliers || 1));
       const targetSpend = totalProcurementSpend * scorecard.esd.targetSupplier;
       const spendRatio = targetSpend > 0 ? blackOwnedSpend / targetSpend : 0;
@@ -498,7 +498,7 @@ const Home = () => {
 
   const toggleSection = (section) => {
     setActiveSection(activeSection === section ? null : section);
-    setIsSidebarOpen(false);
+    setIsSidebarOpen(false); // Close sidebar on section click
   };
 
   const scrollToSection = (sectionId) => {
@@ -511,25 +511,28 @@ const Home = () => {
     if (element) {
       element.scrollIntoView({ behavior: 'smooth' });
     }
-    setIsSidebarOpen(false);
+    setIsSidebarOpen(false); // Close sidebar on navigation click
   };
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-screen bg-gray-100">
-        <p className="text-lg font-semibold text-gray-700">Loading...</p>
+      <div className="flex justify-center items-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="text-center bg-white p-10 rounded-xl shadow-lg">
+          <div className="animate-spin rounded-full h-20 w-20 border-t-4 border-blue-600 border-solid mx-auto mb-6"></div>
+          <p className="text-xl font-semibold text-gray-700">Loading your profile data...</p>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="max-w-4xl mx-auto p-6 bg-gray-100 min-h-screen">
-        <div className="bg-white rounded-lg shadow-lg p-6">
-          <p className="text-red-500 font-medium">{error}</p>
+      <div className="flex justify-center items-center min-h-screen bg-gradient-to-br from-red-50 to-rose-100">
+        <div className="max-w-md mx-auto p-10 bg-white rounded-xl shadow-xl text-center">
+          <p className="text-red-700 font-extrabold text-2xl mb-6">{error}</p>
           <button
             onClick={() => navigate("/Login")}
-            className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition duration-200"
+            className="bg-blue-600 text-white px-8 py-4 rounded-lg hover:bg-blue-700 transition duration-300 ease-in-out text-lg font-medium shadow-md"
           >
             Return to Login
           </button>
@@ -541,37 +544,40 @@ const Home = () => {
   const navItems = [
     { id: 'company', label: 'Company Information' },
     { id: 'financial', label: 'Financial Information', requiresAssessment: true },
-    { id: 'skills', label: 'Skills Development', requiresAssessment: true },
-    { id: 'procurement', label: 'Procurement', requiresAssessment: true },
+    { id: 'skills', label: 'Skills Development (Financial)', requiresAssessment: true },
+    { id: 'procurement', label: 'Procurement (Financial)', requiresAssessment: true },
     { id: 'ownership', label: 'Ownership Assessment', requiresAssessment: true },
     { id: 'management', label: 'Management Control', requiresAssessment: true },
     { id: 'employment', label: 'Employment Equity', requiresAssessment: true },
     { id: 'yes', label: 'Yes 4 Youth Initiative', requiresAssessment: true },
     { id: 'skillsDetails', label: 'Skills Development Details', requiresAssessment: true },
-    { id: 'supplier', label: 'Supplier Development & Imports', requiresAssessment: true },
-    { id: 'enterprise', label: 'Enterprise Development', requiresAssessment: true },
+    { id: 'supplier', label: 'Supplier & Enterprise Dev.', requiresAssessment: true },
     { id: 'socioEconomic', label: 'Socio-Economic Development', requiresAssessment: true },
     { id: 'calculate', label: 'Calculate B-BBEE Score', requiresAssessment: true },
   ];
 
   return (
-    <div className="flex min-h-screen bg-gray-100">
+    <div className="flex min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 w-64 bg-white shadow-lg transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-300 ease-in-out z-50`}>
-        <div className="p-4 border-b flex justify-between items-center">
-          <h2 className="text-lg font-bold text-gray-800">Navigation</h2>
-          <button className="md:hidden" onClick={() => setIsSidebarOpen(false)}>
-            <XMarkIcon className="h-6 w-6 text-gray-600" />
+      <div className={`fixed inset-y-0 left-0 w-72 bg-blue-700 shadow-xl transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-300 ease-in-out z-50 border-r border-blue-800`}>
+        <div className="p-6 border-b border-blue-600 flex justify-between items-center bg-blue-800">
+          <h2 className="text-2xl font-bold text-white">B-BBEE Nav</h2>
+          <button className="md:hidden p-1 rounded-md hover:bg-blue-700 text-white" onClick={() => setIsSidebarOpen(false)}>
+            <XMarkIcon className="h-8 w-8" />
           </button>
         </div>
-        <nav className="p-4">
-          <ul className="space-y-2">
+        <nav className="p-4 overflow-y-auto h-[calc(100vh-6rem)]">
+          <ul className="space-y-3">
             {navItems.map((item) => (
               (!item.requiresAssessment || assessmentStarted) && (
                 <li key={item.id}>
                   <button
                     onClick={() => scrollToSection(item.id)}
-                    className={`w-full text-left px-4 py-2 rounded-md text-sm ${activeSection === item.id ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
+                    className={`w-full text-left px-5 py-3 rounded-lg text-lg font-medium transition duration-200 ease-in-out
+                      ${activeSection === item.id
+                        ? 'bg-blue-500 text-white shadow-md'
+                        : 'text-blue-100 hover:bg-blue-600 hover:text-white'
+                      }`}
                   >
                     {item.label}
                   </button>
@@ -583,29 +589,31 @@ const Home = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 p-6 md:ml-64">
+      <div className="flex-1 p-8 md:ml-72 relative">
         {/* Mobile Menu Button */}
         <button
-          className="md:hidden mb-4 p-2 bg-blue-600 text-white rounded-md"
+          className="md:hidden fixed top-6 left-6 z-40 p-3 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition duration-200"
           onClick={() => setIsSidebarOpen(true)}
         >
-          <Bars3Icon className="h-6 w-6" />
+          <Bars3Icon className="h-8 w-8" />
         </button>
 
         {/* Header */}
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">B-BBEE Calculator Dashboard</h1>
-          <p className="text-gray-600 mb-4">Complete your company information to calculate your B-BBEE score</p>
-          <div className="flex flex-wrap gap-4">
+        <div className="bg-white rounded-3xl shadow-2xl p-10 mb-10 border border-gray-200">
+          <h1 className="text-4xl font-extrabold text-gray-900 mb-4">B-BBEE Calculator Dashboard</h1>
+          <p className="text-gray-700 text-xl mb-8 leading-relaxed">
+            Enter your company's details to accurately assess your B-BBEE score and identify areas for improvement.
+          </p>
+          <div className="flex flex-wrap gap-5">
             <button
               onClick={startNewAssessment}
-              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition duration-200"
+              className="bg-green-600 text-white px-8 py-4 rounded-xl shadow-lg hover:bg-green-700 transition duration-300 ease-in-out font-bold text-lg transform hover:scale-105"
             >
               Start New Assessment
             </button>
             <button
               onClick={loadSavedAssessment}
-              className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300 transition duration-200"
+              className="bg-gray-200 text-gray-800 px-8 py-4 rounded-xl shadow-lg hover:bg-gray-300 transition duration-300 ease-in-out font-bold text-lg"
             >
               Load Saved Assessment
             </button>
@@ -613,39 +621,43 @@ const Home = () => {
         </div>
 
         {/* Non-Grid, Non-Collapsible Sections */}
-        <div className="space-y-4 mb-4">
+        <div className="space-y-10 mb-10">
           {/* Company Information */}
-          <div id="company" className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">Company Information</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <section id="company" className="bg-white rounded-3xl shadow-lg p-10 border border-gray-200">
+            <h2 className="text-3xl font-bold text-gray-800 mb-7 pb-3 border-b-2 border-blue-200">Company Information</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               <div>
-                <label className="block text-sm font-medium mb-1">Company Name</label>
+                <label htmlFor="companyName" className="block text-base font-semibold text-gray-700 mb-2">Company Name</label>
                 <input
                   type="text"
+                  id="companyName"
                   name="companyName"
                   value={financialData.companyName}
                   onChange={handleInputChange}
-                  className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  className="w-full p-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-3 focus:ring-blue-500 transition duration-200 text-lg"
+                  placeholder="e.g., My Company (Pty) Ltd"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Financial Year End</label>
+                <label htmlFor="yearEnd" className="block text-base font-semibold text-gray-700 mb-2">Financial Year End</label>
                 <input
                   type="text"
+                  id="yearEnd"
                   name="yearEnd"
                   value={financialData.yearEnd}
                   onChange={handleInputChange}
                   placeholder="e.g., 31/Mar/2025"
-                  className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  className="w-full p-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-3 focus:ring-blue-500 transition duration-200 text-lg"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Sector</label>
+                <label htmlFor="sector" className="block text-base font-semibold text-gray-700 mb-2">Sector</label>
                 <select
+                  id="sector"
                   name="sector"
                   value={financialData.sector}
                   onChange={handleInputChange}
-                  className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  className="w-full p-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-3 focus:ring-blue-500 transition duration-200 bg-white appearance-none pr-10 text-lg"
                 >
                   <option value="">Select Sector</option>
                   <option value="Generic">Generic</option>
@@ -656,23 +668,23 @@ const Home = () => {
               </div>
             </div>
             {isDirty && (
-              <div className="mt-4 flex justify-end">
+              <div className="mt-10 flex justify-end">
                 <button
                   onClick={handleSave}
-                  className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
+                  className="bg-indigo-600 text-white px-8 py-4 rounded-xl shadow-lg hover:bg-indigo-700 transition duration-300 ease-in-out font-bold text-lg transform hover:scale-105"
                 >
                   Save Changes
                 </button>
               </div>
             )}
-          </div>
+          </section>
 
           {assessmentStarted && (
             <>
               {/* Financial Information */}
-              <div id="financial" className="bg-white rounded-lg shadow-md p-6 mb-6">
-                <h2 className="text-xl font-semibold mb-4">Financial Information</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <section id="financial" className="bg-white rounded-3xl shadow-lg p-10 border border-gray-200">
+                <h2 className="text-3xl font-bold text-gray-800 mb-7 pb-3 border-b-2 border-blue-200">Financial Information</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                   {[
                     { name: "turnover", label: "Turnover / Revenue (R)", placeholder: "Enter turnover" },
                     { name: "npbt", label: "Net Profit Before Tax (R)", placeholder: "Enter NPBT" },
@@ -686,93 +698,97 @@ const Home = () => {
                     { name: "depreciation", label: "Depreciation (R)", placeholder: "Enter depreciation" },
                   ].map((field) => (
                     <div key={field.name}>
-                      <label className="block text-sm font-medium mb-1">{field.label}</label>
+                      <label htmlFor={field.name} className="block text-base font-semibold text-gray-700 mb-2">{field.label}</label>
                       <input
                         type="number"
-                        name="field.name"
+                        id={field.name}
+                        name={field.name}
                         value={financialData[field.name]}
                         onChange={handleInputChange}
-                        className="w-full p-2 border rounded"
+                        className="w-full p-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-3 focus:ring-blue-500 transition duration-200 text-lg"
                         placeholder={field.placeholder}
                       />
                     </div>
                   ))}
                 </div>
-              </div>
+              </section>
 
               {/* Skills Development */}
-              <div id="skills" className="bg-white rounded-lg shadow-md p-6 mb-6">
-                <h2 className="text-xl font-semibold mb-4">Skills Development</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <section id="skills" className="bg-white rounded-3xl shadow-lg p-10 border border-gray-200">
+                <h2 className="text-3xl font-bold text-gray-800 mb-7 pb-3 border-b-2 border-blue-200">Skills Development (Financial)</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div>
-                    <label className="block text-sm font-medium mb-1">Total SDL Payments (R)</label>
+                    <label htmlFor="sdlPayments" className="block text-base font-semibold text-gray-700 mb-2">Total SDL Payments (R)</label>
                     <input
                       type="number"
+                      id="sdlPayments"
                       name="sdlPayments"
                       value={financialData.sdlPayments}
                       onChange={handleInputChange}
-                      className="w-full p-2 border rounded"
+                      className="w-full p-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-3 focus:ring-blue-500 transition duration-200 text-lg"
                       placeholder="Enter SDL payments"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1">Total Leviable Amount (R)</label>
+                    <label htmlFor="totalLeviableAmount" className="block text-base font-semibold text-gray-700 mb-2">Total Leviable Amount (R)</label>
                     <input
                       type="number"
+                      id="totalLeviableAmount"
                       name="totalLeviableAmount"
                       value={financialData.totalLeviableAmount}
                       onChange={handleInputChange}
-                      className="w-full p-2 border rounded"
+                      className="w-full p-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-3 focus:ring-blue-500 transition duration-200 text-lg"
                       placeholder="Enter total leviable amount"
                     />
                   </div>
                 </div>
-              </div>
+              </section>
 
               {/* Procurement */}
-              <div id="procurement" className="bg-white rounded-lg shadow-md p-6 mb-6">
-                <h2 className="text-xl font-semibold mb-4">Procurement</h2>
+              <section id="procurement" className="bg-white rounded-3xl shadow-lg p-10 border border-gray-200">
+                <h2 className="text-3xl font-bold text-gray-800 mb-7 pb-3 border-b-2 border-blue-200">Procurement (Financial)</h2>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Total Measured Procurement Spend (R)</label>
+                  <label htmlFor="totalMeasuredProcurementSpend" className="block text-base font-semibold text-gray-700 mb-2">Total Measured Procurement Spend (R)</label>
                   <input
                     type="number"
+                    id="totalMeasuredProcurementSpend"
                     name="totalMeasuredProcurementSpend"
                     value={financialData.totalMeasuredProcurementSpend}
                     onChange={handleInputChange}
-                    className="w-full p-2 border rounded"
+                    className="w-full p-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-3 focus:ring-blue-500 transition duration-200 text-lg"
                     placeholder="Enter total procurement spend"
                   />
                 </div>
-              </div>
+              </section>
             </>
           )}
         </div>
 
         {/* Grid Sections */}
         {assessmentStarted && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {/* Ownership Assessment */}
-            <div id="ownership" className="bg-white rounded-lg shadow-lg overflow-hidden">
+            <div id="ownership" className="bg-white rounded-3xl shadow-lg overflow-hidden border border-gray-200">
               <button
                 onClick={() => toggleSection('ownership')}
-                className="w-full p-4 flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition duration-200"
+                className="w-full p-6 flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition duration-200 border-b border-gray-200"
               >
-                <h2 className="text-lg font-semibold text-gray-800">Ownership Assessment</h2>
-                <span>{activeSection === 'ownership' ? '▲' : '▼'}</span>
+                <h2 className="text-xl font-bold text-gray-800">Ownership Assessment</h2>
+                {activeSection === 'ownership' ? <ChevronUpIcon className="h-7 w-7 text-gray-600" /> : <ChevronDownIcon className="h-7 w-7 text-gray-600" />}
               </button>
               {activeSection === 'ownership' && (
-                <div className="p-4">
-                  <div className="flex justify-between items-center">
-                    <p className="text-gray-600">
+                <div className="p-6">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-5">
+                    <p className="text-gray-600 text-base">
                       {ownershipDetails?.ownershipData
                         ? `Black Ownership: ${ownershipDetails.ownershipData.blackOwnershipPercentage}%`
-                        : "Add ownership details"}
+                        : "Add ownership details to calculate score."}
                     </p>
                     <button
                       onClick={() => setShowOwnershipModal(true)}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition duration-200"
+                      className="bg-blue-600 text-white px-6 py-3 rounded-lg shadow-md hover:bg-blue-700 transition duration-200 text-base font-medium"
                     >
-                      {ownershipDetails ? "Edit" : "Add"}
+                      {ownershipDetails ? "Edit Details" : "Add Details"}
                     </button>
                   </div>
                 </div>
@@ -780,27 +796,27 @@ const Home = () => {
             </div>
 
             {/* Management Control */}
-            <div id="management" className="bg-white rounded-lg shadow-lg overflow-hidden">
+            <div id="management" className="bg-white rounded-3xl shadow-lg overflow-hidden border border-gray-200">
               <button
                 onClick={() => toggleSection('management')}
-                className="w-full p-4 flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition duration-200"
+                className="w-full p-6 flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition duration-200 border-b border-gray-200"
               >
-                <h2 className="text-lg font-semibold text-gray-800">Management Control</h2>
-                <span>{activeSection === 'management' ? '▲' : '▼'}</span>
+                <h2 className="text-xl font-bold text-gray-800">Management Control</h2>
+                {activeSection === 'management' ? <ChevronUpIcon className="h-7 w-7 text-gray-600" /> : <ChevronDownIcon className="h-7 w-7 text-gray-600" />}
               </button>
               {activeSection === 'management' && (
-                <div className="p-4">
-                  <div className="flex justify-between items-center">
-                    <p className="text-gray-600">
+                <div className="p-6">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-5">
+                    <p className="text-gray-600 text-base">
                       {managementDetails?.managementData
                         ? `Black Voting Rights: ${managementDetails.managementData.blackVotingRights}%`
-                        : "Add management details"}
+                        : "Add management details to calculate score."}
                     </p>
                     <button
                       onClick={() => setShowManagementModal(true)}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition duration-200"
+                      className="bg-blue-600 text-white px-6 py-3 rounded-lg shadow-md hover:bg-blue-700 transition duration-200 text-base font-medium"
                     >
-                      {managementDetails ? "Edit" : "Add"}
+                      {managementDetails ? "Edit Details" : "Add Details"}
                     </button>
                   </div>
                 </div>
@@ -808,27 +824,27 @@ const Home = () => {
             </div>
 
             {/* Employment Equity */}
-            <div id="employment" className="bg-white rounded-lg shadow-lg overflow-hidden">
+            <div id="employment" className="bg-white rounded-3xl shadow-lg overflow-hidden border border-gray-200">
               <button
                 onClick={() => toggleSection('employment')}
-                className="w-full p-4 flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition duration-200"
+                className="w-full p-6 flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition duration-200 border-b border-gray-200"
               >
-                <h2 className="text-lg font-semibold text-gray-800">Employment Equity</h2>
-                <span>{activeSection === 'employment' ? '▲' : '▼'}</span>
+                <h2 className="text-xl font-bold text-gray-800">Employment Equity</h2>
+                {activeSection === 'employment' ? <ChevronUpIcon className="h-7 w-7 text-gray-600" /> : <ChevronDownIcon className="h-7 w-7 text-gray-600" />}
               </button>
               {activeSection === 'employment' && (
-                <div className="p-4">
-                  <div className="flex justify-between items-center">
-                    <p className="text-gray-600">
+                <div className="p-6">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-5">
+                    <p className="text-gray-600 text-base">
                       {employmentDetails?.employmentData
                         ? `Total Employees: ${employmentDetails.employmentData.totalEmployees}`
-                        : "Add employment details"}
+                        : "Add employment details to calculate score."}
                     </p>
                     <button
                       onClick={() => setShowEmploymentModal(true)}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition duration-200"
+                      className="bg-blue-600 text-white px-6 py-3 rounded-lg shadow-md hover:bg-blue-700 transition duration-200 text-base font-medium"
                     >
-                      {employmentDetails ? "Edit" : "Add"}
+                      {employmentDetails ? "Edit Details" : "Add Details"}
                     </button>
                   </div>
                 </div>
@@ -836,27 +852,27 @@ const Home = () => {
             </div>
 
             {/* Yes 4 Youth Initiative */}
-            <div id="yes" className="bg-white rounded-lg shadow-lg overflow-hidden">
+            <div id="yes" className="bg-white rounded-3xl shadow-lg overflow-hidden border border-gray-200">
               <button
                 onClick={() => toggleSection('yes')}
-                className="w-full p-4 flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition duration-200"
+                className="w-full p-6 flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition duration-200 border-b border-gray-200"
               >
-                <h2 className="text-lg font-semibold text-gray-800">Yes 4 Youth Initiative</h2>
-                <span>{activeSection === 'yes' ? '▲' : '▼'}</span>
+                <h2 className="text-xl font-bold text-gray-800">Yes 4 Youth Initiative</h2>
+                {activeSection === 'yes' ? <ChevronUpIcon className="h-7 w-7 text-gray-600" /> : <ChevronDownIcon className="h-7 w-7 text-gray-600" />}
               </button>
               {activeSection === 'yes' && (
-                <div className="p-4">
-                  <div className="flex justify-between items-center">
-                    <p className="text-gray-600">
+                <div className="p-6">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-5">
+                    <p className="text-gray-600 text-base">
                       {yesDetails?.yesData
                         ? `Total Participants: ${yesDetails.yesData.totalParticipants}`
-                        : "Add YES initiative details"}
+                        : "Add YES initiative details to earn bonus points."}
                     </p>
                     <button
                       onClick={() => setShowYesModal(true)}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition duration-200"
+                      className="bg-blue-600 text-white px-6 py-3 rounded-lg shadow-md hover:bg-blue-700 transition duration-200 text-base font-medium"
                     >
-                      {yesDetails ? "Edit" : "Add"}
+                      {yesDetails ? "Edit Details" : "Add Details"}
                     </button>
                   </div>
                 </div>
@@ -864,27 +880,27 @@ const Home = () => {
             </div>
 
             {/* Skills Development Details */}
-            <div id="skillsDetails" className="bg-white rounded-lg shadow-lg overflow-hidden">
+            <div id="skillsDetails" className="bg-white rounded-3xl shadow-lg overflow-hidden border border-gray-200">
               <button
                 onClick={() => toggleSection('skillsDetails')}
-                className="w-full p-4 flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition duration-200"
+                className="w-full p-6 flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition duration-200 border-b border-gray-200"
               >
-                <h2 className="text-lg font-semibold text-gray-800">Skills Development Details</h2>
-                <span>{activeSection === 'skillsDetails' ? '▲' : '▼'}</span>
+                <h2 className="text-xl font-bold text-gray-800">Skills Development Details</h2>
+                {activeSection === 'skillsDetails' ? <ChevronUpIcon className="h-7 w-7 text-gray-600" /> : <ChevronDownIcon className="h-7 w-7 text-gray-600" />}
               </button>
               {activeSection === 'skillsDetails' && (
-                <div className="p-4">
-                  <div className="flex justify-between items-center">
-                    <p className="text-gray-600">
+                <div className="p-6">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-5">
+                    <p className="text-gray-600 text-base">
                       {skillsDevelopmentDetails?.summary
                         ? `Total Trainings: ${skillsDevelopmentDetails.summary.totalTrainings}`
-                        : "Add skills development details"}
+                        : "Add skills development details."}
                     </p>
                     <button
                       onClick={() => setShowSkillsDevelopmentModal(true)}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition duration-200"
+                      className="bg-blue-600 text-white px-6 py-3 rounded-lg shadow-md hover:bg-blue-700 transition duration-200 text-base font-medium"
                     >
-                      {skillsDevelopmentDetails ? "Edit" : "Add"}
+                      {skillsDevelopmentDetails ? "Edit Details" : "Add Details"}
                     </button>
                   </div>
                 </div>
@@ -892,27 +908,27 @@ const Home = () => {
             </div>
 
             {/* Supplier Development & Imports */}
-            <div id="supplier" className="bg-white rounded-lg shadow-lg overflow-hidden">
+            <div id="supplier" className="bg-white rounded-3xl shadow-lg overflow-hidden border border-gray-200">
               <button
                 onClick={() => toggleSection('supplier')}
-                className="w-full p-4 flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition duration-200"
+                className="w-full p-6 flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition duration-200 border-b border-gray-200"
               >
-                <h2 className="text-lg font-semibold text-gray-800">Supplier Development & Imports</h2>
-                <span>{activeSection === 'supplier' ? '▲' : '▼'}</span>
+                <h2 className="text-xl font-bold text-gray-800">Supplier Development & Imports</h2>
+                {activeSection === 'supplier' ? <ChevronUpIcon className="h-7 w-7 text-gray-600" /> : <ChevronDownIcon className="h-7 w-7 text-gray-600" />}
               </button>
               {activeSection === 'supplier' && (
-                <div className="p-4">
-                  <div className="flex justify-between items-center">
-                    <p className="text-gray-600">
+                <div className="p-6">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-5">
+                    <p className="text-gray-600 text-base">
                       {supplierDevelopmentDetails?.localSummary
                         ? `Total Suppliers: ${supplierDevelopmentDetails.localSummary.totalSuppliers}`
-                        : "Add supplier development details"}
+                        : "Add supplier development details."}
                     </p>
                     <button
                       onClick={() => setShowSupplierDevelopmentModal(true)}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition duration-200"
+                      className="bg-blue-600 text-white px-6 py-3 rounded-lg shadow-md hover:bg-blue-700 transition duration-200 text-base font-medium"
                     >
-                      {supplierDevelopmentDetails ? "Edit" : "Add"}
+                      {supplierDevelopmentDetails ? "Edit Details" : "Add Details"}
                     </button>
                   </div>
                 </div>
@@ -920,27 +936,27 @@ const Home = () => {
             </div>
 
             {/* Enterprise Development */}
-            <div id="enterprise" className="bg-white rounded-lg shadow-lg overflow-hidden">
+            <div id="enterprise" className="bg-white rounded-3xl shadow-lg overflow-hidden border border-gray-200">
               <button
                 onClick={() => toggleSection('enterprise')}
-                className="w-full p-4 flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition duration-200"
+                className="w-full p-6 flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition duration-200 border-b border-gray-200"
               >
-                <h2 className="text-lg font-semibold text-gray-800">Enterprise Development</h2>
-                <span>{activeSection === 'enterprise' ? '▲' : '▼'}</span>
+                <h2 className="text-xl font-bold text-gray-800">Enterprise Development</h2>
+                {activeSection === 'enterprise' ? <ChevronUpIcon className="h-7 w-7 text-gray-600" /> : <ChevronDownIcon className="h-7 w-7 text-gray-600" />}
               </button>
               {activeSection === 'enterprise' && (
-                <div className="p-4">
-                  <div className="flex justify-between items-center">
-                    <p className="text-gray-600">
+                <div className="p-6">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-5">
+                    <p className="text-gray-600 text-base">
                       {enterpriseDevelopmentDetails?.summary
                         ? `Total Beneficiaries: ${enterpriseDevelopmentDetails.summary.totalBeneficiaries}`
-                        : "Add enterprise development details"}
+                        : "Add enterprise development details."}
                     </p>
                     <button
                       onClick={() => setShowEnterpriseDevelopmentModal(true)}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition duration-200"
+                      className="bg-blue-600 text-white px-6 py-3 rounded-lg shadow-md hover:bg-blue-700 transition duration-200 text-base font-medium"
                     >
-                      {enterpriseDevelopmentDetails ? "Edit" : "Add"}
+                      {enterpriseDevelopmentDetails ? "Edit Details" : "Add Details"}
                     </button>
                   </div>
                 </div>
@@ -948,27 +964,27 @@ const Home = () => {
             </div>
 
             {/* Socio-Economic Development */}
-            <div id="socioEconomic" className="bg-white rounded-lg shadow-lg overflow-hidden">
+            <div id="socioEconomic" className="bg-white rounded-3xl shadow-lg overflow-hidden border border-gray-200">
               <button
                 onClick={() => toggleSection('socioEconomic')}
-                className="w-full p-4 flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition duration-200"
+                className="w-full p-6 flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition duration-200 border-b border-gray-200"
               >
-                <h2 className="text-lg font-semibold text-gray-800">Socio-Economic Development</h2>
-                <span>{activeSection === 'socioEconomic' ? '▲' : '▼'}</span>
+                <h2 className="text-xl font-bold text-gray-800">Socio-Economic Development</h2>
+                {activeSection === 'socioEconomic' ? <ChevronUpIcon className="h-7 w-7 text-gray-600" /> : <ChevronDownIcon className="h-7 w-7 text-gray-600" />}
               </button>
               {activeSection === 'socioEconomic' && (
-                <div className="p-4">
-                  <div className="flex justify-between items-center">
-                    <p className="text-gray-600">
+                <div className="p-6">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-5">
+                    <p className="text-gray-600 text-base">
                       {socioEconomicDevelopmentDetails?.summary
                         ? `Total Beneficiaries: ${socioEconomicDevelopmentDetails.summary.totalBeneficiaries}`
-                        : "Add socio-economic development details"}
+                        : "Add socio-economic development details."}
                     </p>
                     <button
                       onClick={() => setShowSocioEconomicDevelopmentModal(true)}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition duration-200"
+                      className="bg-blue-600 text-white px-6 py-3 rounded-lg shadow-md hover:bg-blue-700 transition duration-200 text-base font-medium"
                     >
-                      {socioEconomicDevelopmentDetails ? "Edit" : "Add"}
+                      {socioEconomicDevelopmentDetails ? "Edit Details" : "Add Details"}
                     </button>
                   </div>
                 </div>
@@ -976,10 +992,10 @@ const Home = () => {
             </div>
 
             {/* Calculate Button */}
-            <div id="calculate" className="col-span-full flex justify-center mt-6">
+            <div id="calculate" className="col-span-full flex justify-center mt-12">
               <button
                 onClick={calculateBBBEEScore}
-                className="bg-green-600 text-white px-8 py-3 rounded-md hover:bg-green-700 font-bold text-lg transition duration-200"
+                className="bg-purple-700 text-white px-12 py-5 rounded-2xl shadow-xl hover:bg-purple-800 font-extrabold text-2xl transition duration-300 ease-in-out transform hover:scale-105"
               >
                 Calculate B-BBEE Score
               </button>
