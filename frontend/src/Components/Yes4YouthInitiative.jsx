@@ -66,7 +66,6 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
             console.log('Set documentId:', data[0].id);
           } else {
             console.log('No YES initiative data found for userId:', userId);
-            // Allow form to load empty
             setParticipants([]);
             setYesData({
               totalParticipants: 0,
@@ -87,7 +86,6 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
             console.warn('Failed to parse error response');
           }
           console.warn('GET request failed with status:', response.status, 'Message:', errorMessage);
-          // Suppress alert for "No YES 4 Youth Initiative data found" 404
           if (response.status === 404 && errorMessage === 'No YES 4 Youth Initiative data found for this user') {
             setParticipants([]);
             setYesData({
@@ -114,7 +112,6 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
       } catch (error) {
         console.error('Error fetching YES initiative data:', error);
         alert(`Failed to fetch YES initiative data: ${error.message}`);
-        // Allow form to load empty
         setParticipants([]);
         setYesData({
           totalParticipants: 0,
@@ -137,6 +134,101 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
     setNewParticipant({
       ...newParticipant,
       [name]: type === 'checkbox' ? checked : type === 'number' ? Number(value) : value,
+    });
+  };
+
+  const handleParticipantCSVUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.csv')) {
+      alert('Please upload a CSV file');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target.result;
+      try {
+        const parsedData = parseParticipantCSV(text);
+        const validatedData = validateParticipantCSVData(parsedData);
+        const updatedParticipants = [...participants, ...validatedData];
+        setParticipants(updatedParticipants);
+        recalculateYesData(updatedParticipants);
+      } catch (error) {
+        alert(`Error processing participant CSV file: ${error.message}`);
+      }
+    };
+    reader.onerror = () => {
+      alert('Error reading the participant CSV file');
+    };
+    reader.readAsText(file);
+  };
+
+  const parseParticipantCSV = (text) => {
+    const lines = text.split('\n').filter(line => line.trim() !== '');
+    if (lines.length === 0) throw new Error('Empty CSV file');
+
+    const headers = lines[0].split(',').map(header => header.trim().toLowerCase());
+    const requiredHeaders = [
+      'name',
+      'sitelocation',
+      'idnumber',
+      'jobtitle',
+      'race',
+      'gender',
+      'occupationallevel',
+      'hostemployeryear',
+      'monthlystipend',
+      'startdate',
+      'enddate',
+      'iscurrentyesemployee',
+      'iscompletedyesabsorbed'
+    ];
+
+    if (!requiredHeaders.every(header => headers.includes(header))) {
+      throw new Error('Participant CSV file must contain all required headers: ' + requiredHeaders.join(', '));
+    }
+
+    return lines.slice(1).map(line => {
+      const values = line.split(',').map(val => val.trim());
+      const obj = {};
+      headers.forEach((header, index) => {
+        obj[header] = values[index] || '';
+      });
+      return {
+        name: obj.name,
+        siteLocation: obj.sitelocation,
+        idNumber: obj.idnumber,
+        jobTitle: obj.jobtitle,
+        race: obj.race,
+        gender: obj.gender,
+        occupationalLevel: obj.occupationallevel,
+        hostEmployerYear: obj.hostemployeryear,
+        monthlyStipend: Number(obj.monthlystipend) || 0,
+        startDate: obj.startdate,
+        endDate: obj.enddate,
+        isCurrentYesEmployee: obj.iscurrentyesemployee.toLowerCase() === 'true',
+        isCompletedYesAbsorbed: obj.iscompletedyesabsorbed.toLowerCase() === 'true',
+      };
+    });
+  };
+
+  const validateParticipantCSVData = (data) => {
+    return data.filter(item => {
+      if (!item.name || !item.idNumber || !item.jobTitle || !item.startDate) {
+        console.warn('Skipping invalid participant CSV row:', item);
+        return false;
+      }
+      if (participants.some(participant => participant.idNumber === item.idNumber)) {
+        console.warn('Skipping duplicate ID number in CSV:', item.idNumber);
+        return false;
+      }
+      if (item.monthlyStipend < 0) {
+        console.warn('Invalid stipend value in participant CSV row:', item);
+        return false;
+      }
+      return true;
     });
   };
 
@@ -187,12 +279,10 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
     if (window.confirm('Are you sure you want to delete this participant?')) {
       setIsLoading(true);
       try {
-        // Optimistically update the UI
         const updatedParticipants = participants.filter((_, i) => i !== index);
         setParticipants(updatedParticipants);
         recalculateYesData(updatedParticipants);
 
-        // Ensure documentId is available
         let currentDocumentId = documentId;
         if (!currentDocumentId) {
           const checkResponse = await fetch(`http://localhost:5000/yes4youth-initiative/${userId}`, {
@@ -212,7 +302,6 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
           setDocumentId(currentDocumentId);
         }
 
-        // Update backend
         const response = await fetch(`http://localhost:5000/yes4youth-initiative/${currentDocumentId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -228,7 +317,6 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
       } catch (error) {
         console.error('Error deleting participant:', error);
         alert(`Failed to delete participant: ${error.message}`);
-        // Re-fetch to restore state
         try {
           const response = await fetch(`http://localhost:5000/yes4youth-initiative/${userId}`, {
             method: 'GET',
@@ -295,7 +383,6 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
       } catch (error) {
         console.error('Error deleting YES initiative data:', error);
         alert(`Failed to delete: ${error.message}`);
-        // Re-fetch to restore state
         try {
           const response = await fetch(`http://localhost:5000/yes4youth-initiative/${userId}`, {
             method: 'GET',
@@ -447,6 +534,23 @@ const Yes4YouthInitiative = ({ userId, onClose, onSubmit }) => {
         <h2 className="text-xl font-semibold mb-4">Yes 4 Youth Initiative Details</h2>
 
         <form onSubmit={handleSubmit}>
+          {/* Participant CSV Upload */}
+          <div className="mb-6">
+            <h3 className="text-lg font-medium mb-2">Upload Participants CSV</h3>
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleParticipantCSVUpload}
+              className="w-full p-2 border rounded"
+              disabled={isLoading}
+            />
+            <p className="text-sm text-gray-600 mt-2">
+              CSV file must contain headers: name, siteLocation, idNumber, jobTitle, race, gender,
+              occupationalLevel, hostEmployerYear, monthlyStipend, startDate, endDate,
+              isCurrentYesEmployee, isCompletedYesAbsorbed
+            </p>
+          </div>
+
           {/* Participant Input Form */}
           <div className="mb-6">
             <h3 className="text-lg font-medium mb-2">Add YES Participant</h3>
