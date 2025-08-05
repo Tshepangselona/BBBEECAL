@@ -123,6 +123,225 @@ const OwnershipDetails = ({ userId, onClose, onSubmit }) => {
     });
   };
 
+  const handleParticipantCSVUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.csv')) {
+      alert('Please upload a CSV file');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target.result;
+      try {
+        const parsedData = parseParticipantCSV(text);
+        const validatedData = validateParticipantCSVData(parsedData);
+        const updatedParticipants = [...participants, ...validatedData];
+        setParticipants(updatedParticipants);
+        recalculateOwnershipData(updatedParticipants);
+      } catch (error) {
+        alert(`Error processing participant CSV file: ${error.message}`);
+      }
+    };
+    reader.onerror = () => {
+      alert('Error reading the participant CSV file');
+    };
+    reader.readAsText(file);
+  };
+
+  const parseParticipantCSV = (text) => {
+    const lines = text.split('\n').filter(line => line.trim() !== '');
+    if (lines.length === 0) throw new Error('Empty CSV file');
+
+    const headers = lines[0].split(',').map(header => header.trim().toLowerCase());
+    const requiredHeaders = [
+      'name',
+      'idnumber',
+      'race',
+      'gender',
+      'isforeign',
+      'isnewentrant',
+      'designatedgroups',
+      'isyouth',
+      'isdisabled',
+      'isunemployed',
+      'islivinginruralareas',
+      'ismilitaryveteran',
+      'economicinterest',
+      'votingrights',
+      'outstandingdebt'
+    ];
+
+    if (!requiredHeaders.every(header => headers.includes(header))) {
+      throw new Error('Participant CSV file must contain all required headers: ' + requiredHeaders.join(', '));
+    }
+
+    return lines.slice(1).map(line => {
+      const values = line.split(',').map(val => val.trim());
+      const obj = {};
+      headers.forEach((header, index) => {
+        obj[header] = values[index] || '';
+      });
+      return {
+        name: obj.name,
+        idNumber: obj.idnumber,
+        race: obj.race,
+        gender: obj.gender,
+        isForeign: obj.isforeign.toLowerCase() === 'true',
+        isNewEntrant: obj.isnewentrant.toLowerCase() === 'true',
+        designatedGroups: obj.designatedgroups.toLowerCase() === 'true',
+        isYouth: obj.isyouth.toLowerCase() === 'true',
+        isDisabled: obj.isdisabled.toLowerCase() === 'true',
+        isUnemployed: obj.isunemployed.toLowerCase() === 'true',
+        isLivingInRuralAreas: obj.islivinginruralareas.toLowerCase() === 'true',
+        isMilitaryVeteran: obj.ismilitaryveteran.toLowerCase() === 'true',
+        economicInterest: Number(obj.economicinterest) || 0,
+        votingRights: Number(obj.votingrights) || 0,
+        outstandingDebt: Number(obj.outstandingdebt) || 0,
+      };
+    });
+  };
+
+  const validateParticipantCSVData = (data) => {
+    return data.filter(item => {
+      if (!item.name || !item.idNumber) {
+        console.warn('Skipping invalid participant CSV row:', item);
+        return false;
+      }
+      if (participants.some(participant => participant.idNumber === item.idNumber)) {
+        console.warn('Skipping duplicate ID number in CSV:', item.idNumber);
+        return false;
+      }
+      if (item.economicInterest < 0 || item.economicInterest > 100 || item.votingRights < 0 || item.votingRights > 100) {
+        console.warn('Invalid percentage value in participant CSV row:', item);
+        return false;
+      }
+      return true;
+    });
+  };
+
+  const handleEntityCSVUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.csv')) {
+      alert('Please upload a CSV file');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target.result;
+      try {
+        const parsedData = parseEntityCSV(text);
+        const validatedData = validateEntityCSVData(parsedData);
+        const updatedEntities = [...entities, ...validatedData];
+        setEntities(updatedEntities);
+        recalculateOwnershipDataFromEntities(updatedEntities);
+      } catch (error) {
+        alert(`Error processing entity CSV file: ${error.message}`);
+      }
+    };
+    reader.onerror = () => {
+      alert('Error reading the entity CSV file');
+    };
+    reader.readAsText(file);
+  };
+
+  const parseEntityCSV = (text) => {
+    const lines = text.split('\n').filter(line => line.trim() !== '');
+    if (lines.length === 0) throw new Error('Empty CSV file');
+
+    const headers = lines[0].split(',').map(header => header.trim().toLowerCase());
+    const requiredHeaders = [
+      'tier',
+      'entityname',
+      'ownershipinnexttier',
+      'modifiedflowthroughapplied',
+      'totalblackvotingrights',
+      'blackwomenvotingrights',
+      'totalblackeconomicinterest',
+      'blackwomeneconomicinterest',
+      'newentrants',
+      'designatedgroups',
+      'youth',
+      'disabled',
+      'unemployed',
+      'livinginruralareas',
+      'militaryveteran',
+      'esopbbos',
+      'coops',
+      'outstandingdebtbyblackparticipants'
+    ];
+
+    if (!requiredHeaders.every(header => headers.includes(header))) {
+      throw new Error('Entity CSV file must contain all required headers: ' + requiredHeaders.join(', '));
+    }
+
+    return lines.slice(1).map(line => {
+      const values = line.split(',').map(val => val.trim());
+      const obj = {};
+      headers.forEach((header, index) => {
+        obj[header] = values[index] || '';
+      });
+      return {
+        tier: obj.tier,
+        entityName: obj.entityname,
+        ownershipInNextTier: Number(obj.ownershipinnexttier) || 0,
+        modifiedFlowThroughApplied: obj.modifiedflowthroughapplied.toLowerCase() === 'true',
+        totalBlackVotingRights: Number(obj.totalblackvotingrights) || 0,
+        blackWomenVotingRights: Number(obj.blackwomenvotingrights) || 0,
+        totalBlackEconomicInterest: Number(obj.totalblackeconomicinterest) || 0,
+        blackWomenEconomicInterest: Number(obj.blackwomeneconomicinterest) || 0,
+        newEntrants: Number(obj.newentrants) || 0,
+        designatedGroups: Number(obj.designatedgroups) || 0,
+        youth: Number(obj.youth) || 0,
+        disabled: Number(obj.disabled) || 0,
+        unemployed: Number(obj.unemployed) || 0,
+        livingInRuralAreas: Number(obj.livinginruralareas) || 0,
+        militaryVeteran: Number(obj.militaryveteran) || 0,
+        esopBbos: Number(obj.esopbbos) || 0,
+        coOps: Number(obj.coops) || 0,
+        outstandingDebtByBlackParticipants: Number(obj.outstandingdebtbyblackparticipants) || 0,
+      };
+    });
+  };
+
+  const validateEntityCSVData = (data) => {
+    return data.filter(item => {
+      if (!item.tier || !item.entityName) {
+        console.warn('Skipping invalid entity CSV row:', item);
+        return false;
+      }
+      if (entities.some(entity => entity.entityName === item.entityName && entity.tier === item.tier)) {
+        console.warn('Skipping duplicate entity name and tier in CSV:', item.entityName, item.tier);
+        return false;
+      }
+      if (
+        item.ownershipInNextTier < 0 || item.ownershipInNextTier > 100 ||
+        item.totalBlackVotingRights < 0 || item.totalBlackVotingRights > 100 ||
+        item.blackWomenVotingRights < 0 || item.blackWomenVotingRights > 100 ||
+        item.totalBlackEconomicInterest < 0 || item.totalBlackEconomicInterest > 100 ||
+        item.blackWomenEconomicInterest < 0 || item.blackWomenEconomicInterest > 100 ||
+        item.newEntrants < 0 || item.newEntrants > 100 ||
+        item.designatedGroups < 0 || item.designatedGroups > 100 ||
+        item.youth < 0 || item.youth > 100 ||
+        item.disabled < 0 || item.disabled > 100 ||
+        item.unemployed < 0 || item.unemployed > 100 ||
+        item.livingInRuralAreas < 0 || item.livingInRuralAreas > 100 ||
+        item.militaryVeteran < 0 || item.militaryVeteran > 100 ||
+        item.esopBbos < 0 || item.esopBbos > 100 ||
+        item.coOps < 0 || item.coOps > 100
+      ) {
+        console.warn('Invalid percentage value in entity CSV row:', item);
+        return false;
+      }
+      return true;
+    });
+  };
+
   const addParticipant = () => {
     if (!newParticipant.name || !newParticipant.idNumber) {
       alert('Please fill in the Name and ID Number.');
@@ -170,12 +389,10 @@ const OwnershipDetails = ({ userId, onClose, onSubmit }) => {
     if (window.confirm('Are you sure you want to delete this participant?')) {
       setIsLoading(true);
       try {
-        // Optimistically update the UI
         const updatedParticipants = participants.filter((_, i) => i !== index);
         setParticipants(updatedParticipants);
         recalculateOwnershipData(updatedParticipants);
 
-        // Ensure documentId is available
         let currentDocumentId = documentId;
         if (!currentDocumentId) {
           const checkResponse = await fetch(`http://localhost:5000/ownership-details/${userId}`, {
@@ -195,7 +412,6 @@ const OwnershipDetails = ({ userId, onClose, onSubmit }) => {
           setDocumentId(currentDocumentId);
         }
 
-        // Update backend
         const response = await fetch(`http://localhost:5000/ownership-details/${currentDocumentId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -211,7 +427,6 @@ const OwnershipDetails = ({ userId, onClose, onSubmit }) => {
       } catch (error) {
         console.error('Error deleting participant:', error);
         alert(`Failed to delete participant: ${error.message}`);
-        // Re-fetch to restore state
         try {
           const response = await fetch(`http://localhost:5000/ownership-details/${userId}`, {
             method: 'GET',
@@ -305,7 +520,6 @@ const OwnershipDetails = ({ userId, onClose, onSubmit }) => {
       } catch (error) {
         console.error('Error deleting ownership data:', error);
         alert(`Failed to delete: ${error.message}`);
-        // Re-fetch to restore state
         try {
           const response = await fetch(`http://localhost:5000/ownership-details/${userId}`, {
             method: 'GET',
@@ -355,6 +569,7 @@ const OwnershipDetails = ({ userId, onClose, onSubmit }) => {
           }
         } catch (fetchError) {
           console.error('Error re-fetching data:', fetchError);
+          alert('Failed to restore data. Please refresh the page.');
         }
       } finally {
         setIsLoading(false);
@@ -659,6 +874,23 @@ const OwnershipDetails = ({ userId, onClose, onSubmit }) => {
         <h2 className="text-xl font-semibold mb-4">Ownership Details</h2>
 
         <form onSubmit={handleSubmit}>
+          {/* Participant CSV Upload */}
+          <div className="mb-6">
+            <h3 className="text-lg font-medium mb-2">Upload Participants CSV</h3>
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleParticipantCSVUpload}
+              className="w-full p-2 border rounded"
+              disabled={isLoading}
+            />
+            <p className="text-sm text-gray-600 mt-2">
+              CSV file must contain headers: name, idNumber, race, gender, isForeign, isNewEntrant,
+              designatedGroups, isYouth, isDisabled, isUnemployed, isLivingInRuralAreas,
+              isMilitaryVeteran, economicInterest, votingRights, outstandingDebt
+            </p>
+          </div>
+
           {/* Participant Input Form */}
           <div className="mb-6">
             <h3 className="text-lg font-medium mb-2">Add Participant</h3>
@@ -928,6 +1160,25 @@ const OwnershipDetails = ({ userId, onClose, onSubmit }) => {
               </div>
             </div>
           )}
+
+          {/* Entity CSV Upload */}
+          <div className="mb-6">
+            <h3 className="text-lg font-medium mb-2">Upload Entities CSV</h3>
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleEntityCSVUpload}
+              className="w-full p-2 border rounded"
+              disabled={isLoading}
+            />
+            <p className="text-sm text-gray-600 mt-2">
+              CSV file must contain headers: tier, entityName, ownershipInNextTier, modifiedFlowThroughApplied,
+              totalBlackVotingRights, blackWomenVotingRights, totalBlackEconomicInterest,
+              blackWomenEconomicInterest, newEntrants, designatedGroups, youth, disabled,
+              unemployed, livingInRuralAreas, militaryVeteran, esopBbos, coOps,
+              outstandingDebtByBlackParticipants
+            </p>
+          </div>
 
           {/* Entity Input Form */}
           <div className="mb-6">

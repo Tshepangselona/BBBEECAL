@@ -71,7 +71,98 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
     const { name, value, type, checked } = e.target;
     setNewEmployee({
       ...newEmployee,
-      [name]: type === 'checkbox' ? checked : value,
+      [name]: type === 'checkbox' ? checked : type === 'number' ? Number(value) : value,
+    });
+  };
+
+  const handleEmployeeCSVUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.csv')) {
+      alert('Please upload a CSV file');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target.result;
+      try {
+        const parsedData = parseEmployeeCSV(text);
+        const validatedData = validateEmployeeCSVData(parsedData);
+        const updatedEmployees = [...employees, ...validatedData];
+        setEmployees(updatedEmployees);
+        recalculateEmploymentData(updatedEmployees);
+      } catch (error) {
+        alert(`Error processing employee CSV file: ${error.message}`);
+      }
+    };
+    reader.onerror = () => {
+      alert('Error reading the employee CSV file');
+    };
+    reader.readAsText(file);
+  };
+
+  const parseEmployeeCSV = (text) => {
+    const lines = text.split('\n').filter(line => line.trim() !== '');
+    if (lines.length === 0) throw new Error('Empty CSV file');
+
+    const headers = lines[0].split(',').map(header => header.trim().toLowerCase());
+    const requiredHeaders = [
+      'name',
+      'sitelocation',
+      'idnumber',
+      'jobtitle',
+      'race',
+      'gender',
+      'isdisabled',
+      'descriptionofdisability',
+      'isforeign',
+      'occupationallevel',
+      'grossmonthlysalary'
+    ];
+
+    if (!requiredHeaders.every(header => headers.includes(header))) {
+      throw new Error('Employee CSV file must contain all required headers: ' + requiredHeaders.join(', '));
+    }
+
+    return lines.slice(1).map(line => {
+      const values = line.split(',').map(val => val.trim());
+      const obj = {};
+      headers.forEach((header, index) => {
+        obj[header] = values[index] || '';
+      });
+      return {
+        name: obj.name,
+        siteLocation: obj.sitelocation,
+        idNumber: obj.idnumber,
+        jobTitle: obj.jobtitle,
+        race: obj.race,
+        gender: obj.gender,
+        isDisabled: obj.isdisabled.toLowerCase() === 'true',
+        descriptionOfDisability: obj.descriptionofdisability,
+        isForeign: obj.isforeign.toLowerCase() === 'true',
+        occupationalLevel: obj.occupationallevel,
+        grossMonthlySalary: Number(obj.grossmonthlysalary) || 0,
+      };
+    });
+  };
+
+  const validateEmployeeCSVData = (data) => {
+    return data.filter(item => {
+      if (!item.name || !item.idNumber || !item.jobTitle || !item.occupationalLevel) {
+        console.warn('Skipping invalid employee CSV row:', item);
+        return false;
+      }
+      if (employees.some(employee => employee.idNumber === item.idNumber)) {
+        console.warn('Skipping duplicate ID number in CSV:', item.idNumber);
+        return false;
+      }
+      if (item.grossMonthlySalary < 0) {
+        console.warn('Invalid salary value in employee CSV row:', item);
+        return false;
+      }
+      return true;
     });
   };
 
@@ -80,7 +171,10 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
       alert('Please fill in the Name, ID Number, Job Title, and Occupational Level.');
       return;
     }
-
+    if (employees.some(employee => employee.idNumber === newEmployee.idNumber)) {
+      alert('An employee with this ID Number already exists.');
+      return;
+    }
     const updatedEmployees = [...employees, newEmployee];
     setEmployees(updatedEmployees);
     resetNewEmployee();
@@ -97,7 +191,15 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
       alert('Please fill in the Name, ID Number, Job Title, and Occupational Level.');
       return;
     }
-
+    if (
+      employees.some(
+        (employee, index) =>
+          employee.idNumber === newEmployee.idNumber && index !== editingEmployeeIndex
+      )
+    ) {
+      alert('An employee with this ID Number already exists.');
+      return;
+    }
     const updatedEmployees = employees.map((employee, index) =>
       index === editingEmployeeIndex ? newEmployee : employee
     );
@@ -114,7 +216,6 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
         const updatedEmployees = employees.filter((_, i) => i !== index);
         recalculateEmploymentData(updatedEmployees);
 
-        // Check if data exists to get the document ID
         const checkResponse = await fetch(`http://localhost:5000/employment-equity/${userId}`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
@@ -124,7 +225,6 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
           const { data } = await checkResponse.json();
           if (data.length > 0) {
             const existingId = data[0].id;
-            // Update Firestore with the new employee list
             const response = await fetch(`http://localhost:5000/employment-equity/${existingId}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
@@ -133,7 +233,7 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
 
             if (!response.ok) {
               const errorData = await response.json();
-              throw new Error(`Failed to update employee data: ${errorData.error}`);
+              throw new Error(`Failed to update employee data: ${errorData.error || 'Unknown error'}`);
             }
           }
         }
@@ -142,14 +242,21 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
       } catch (error) {
         console.error('Error deleting employee:', error);
         alert(`Failed to delete employee: ${error.message}`);
-        // Revert state if needed
-        const response = await fetch(`http://localhost:5000/employment-equity/${userId}`);
-        if (response.ok) {
-          const { data } = await response.json();
-          if (data.length > 0) {
-            setEmployees(data[0].employees);
-            setEmploymentData(data[0].employmentData);
+        try {
+          const response = await fetch(`http://localhost:5000/employment-equity/${userId}`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+          });
+          if (response.ok) {
+            const { data } = await response.json();
+            if (data.length > 0) {
+              setEmployees(data[0].employees);
+              setEmploymentData(data[0].employmentData);
+            }
           }
+        } catch (fetchError) {
+          console.error('Error re-fetching data:', fetchError);
+          alert('Failed to restore data. Please refresh the page.');
         }
       } finally {
         setIsLoading(false);
@@ -234,7 +341,6 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
 
     setIsLoading(true);
     try {
-      // Check if data exists to determine POST or PUT
       const checkResponse = await fetch(`http://localhost:5000/employment-equity/${userId}`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
@@ -287,7 +393,7 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(`Failed to delete employment equity data: ${errorData.error}`);
+          throw new Error(`Failed to delete employment equity data: ${errorData.error || 'Unknown error'}`);
         }
 
         console.log('Employment equity data deleted');
@@ -311,14 +417,21 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
       } catch (error) {
         console.error('Error deleting employment equity data:', error);
         alert(`Failed to delete: ${error.message}`);
-        // Re-fetch data to restore state
-        const response = await fetch(`http://localhost:5000/employment-equity/${userId}`);
-        if (response.ok) {
-          const { data } = await response.json();
-          if (data.length > 0) {
-            setEmployees(data[0].employees);
-            setEmploymentData(data[0].employmentData);
+        try {
+          const response = await fetch(`http://localhost:5000/employment-equity/${userId}`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+          });
+          if (response.ok) {
+            const { data } = await response.json();
+            if (data.length > 0) {
+              setEmployees(data[0].employees);
+              setEmploymentData(data[0].employmentData);
+            }
           }
+        } catch (fetchError) {
+          console.error('Error re-fetching data:', fetchError);
+          alert('Failed to restore data. Please refresh the page.');
         }
       } finally {
         setIsLoading(false);
@@ -332,6 +445,22 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
         <h2 className="text-xl font-semibold mb-4">Employment Equity Details</h2>
 
         <form onSubmit={handleSubmit}>
+          {/* Employee CSV Upload */}
+          <div className="mb-6">
+            <h3 className="text-lg font-medium mb-2">Upload Employees CSV</h3>
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleEmployeeCSVUpload}
+              className="w-full p-2 border rounded"
+              disabled={isLoading}
+            />
+            <p className="text-sm text-gray-600 mt-2">
+              CSV file must contain headers: name, siteLocation, idNumber, jobTitle, race, gender,
+              isDisabled, descriptionOfDisability, isForeign, occupationalLevel, grossMonthlySalary
+            </p>
+          </div>
+
           {/* Employee Input Form */}
           <div className="mb-6">
             <h3 className="text-lg font-medium mb-2">Add Employee</h3>
@@ -515,15 +644,15 @@ const EmploymentEquity = ({ userId, onClose, onSubmit }) => {
                   </thead>
                   <tbody>
                     {employees.map((employee, index) => (
-                      <tr key={index}>
+                      <tr key={employee.idNumber}>
                         <td className="border border-gray-300 px-4 py-2">{employee.name}</td>
-                        <td className="border border-gray-300 px-4 py-2">{employee.siteLocation}</td>
+                        <td className="border border-gray-300 px-4 py-2">{employee.siteLocation || 'N/A'}</td>
                         <td className="border border-gray-300 px-4 py-2">{employee.idNumber}</td>
                         <td className="border border-gray-300 px-4 py-2">{employee.jobTitle}</td>
                         <td className="border border-gray-300 px-4 py-2">{employee.race}</td>
                         <td className="border border-gray-300 px-4 py-2">{employee.gender}</td>
                         <td className="border border-gray-300 px-4 py-2">{employee.isDisabled ? 'Yes' : 'No'}</td>
-                        <td className="border border-gray-300 px-4 py-2">{employee.descriptionOfDisability}</td>
+                        <td className="border border-gray-300 px-4 py-2">{employee.descriptionOfDisability || 'N/A'}</td>
                         <td className="border border-gray-300 px-4 py-2">{employee.isForeign ? 'Yes' : 'No'}</td>
                         <td className="border border-gray-300 px-4 py-2">{employee.occupationalLevel}</td>
                         <td className="border border-gray-300 px-4 py-2">{employee.grossMonthlySalary}</td>

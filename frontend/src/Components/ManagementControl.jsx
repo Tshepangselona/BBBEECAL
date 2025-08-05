@@ -78,6 +78,97 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
     });
   };
 
+  const handleManagerCSVUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.csv')) {
+      alert('Please upload a CSV file');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target.result;
+      try {
+        const parsedData = parseManagerCSV(text);
+        const validatedData = validateManagerCSVData(parsedData);
+        const updatedManagers = [...managers, ...validatedData];
+        setManagers(updatedManagers);
+        recalculateManagementData(updatedManagers);
+      } catch (error) {
+        alert(`Error processing manager CSV file: ${error.message}`);
+      }
+    };
+    reader.onerror = () => {
+      alert('Error reading the manager CSV file');
+    };
+    reader.readAsText(file);
+  };
+
+  const parseManagerCSV = (text) => {
+    const lines = text.split('\n').filter(line => line.trim() !== '');
+    if (lines.length === 0) throw new Error('Empty CSV file');
+
+    const headers = lines[0].split(',').map(header => header.trim().toLowerCase());
+    const requiredHeaders = [
+      'name',
+      'sitelocation',
+      'idnumber',
+      'position',
+      'jobtitle',
+      'race',
+      'gender',
+      'isdisabled',
+      'votingrights',
+      'isexecutivedirector',
+      'isindependentnonexecutive'
+    ];
+
+    if (!requiredHeaders.every(header => headers.includes(header))) {
+      throw new Error('Manager CSV file must contain all required headers: ' + requiredHeaders.join(', '));
+    }
+
+    return lines.slice(1).map(line => {
+      const values = line.split(',').map(val => val.trim());
+      const obj = {};
+      headers.forEach((header, index) => {
+        obj[header] = values[index] || '';
+      });
+      return {
+        name: obj.name,
+        siteLocation: obj.sitelocation,
+        idNumber: obj.idnumber,
+        position: obj.position,
+        jobTitle: obj.jobtitle,
+        race: obj.race,
+        gender: obj.gender,
+        isDisabled: obj.isdisabled.toLowerCase() === 'true',
+        votingRights: Number(obj.votingrights) || 0,
+        isExecutiveDirector: obj.isexecutivedirector.toLowerCase() === 'true',
+        isIndependentNonExecutive: obj.isindependentnonexecutive.toLowerCase() === 'true',
+      };
+    });
+  };
+
+  const validateManagerCSVData = (data) => {
+    return data.filter(item => {
+      if (!item.name || !item.idNumber || !item.position) {
+        console.warn('Skipping invalid manager CSV row:', item);
+        return false;
+      }
+      if (managers.some(manager => manager.idNumber === item.idNumber)) {
+        console.warn('Skipping duplicate ID number in CSV:', item.idNumber);
+        return false;
+      }
+      if (item.votingRights < 0 || item.votingRights > 100) {
+        console.warn('Invalid voting rights value in manager CSV row:', item);
+        return false;
+      }
+      return true;
+    });
+  };
+
   const addManager = () => {
     if (!newManager.name || !newManager.idNumber || !newManager.position) {
       alert('Please fill in the Name, ID Number, and Position.');
@@ -125,12 +216,10 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
     if (window.confirm('Are you sure you want to delete this manager?')) {
       setIsLoading(true);
       try {
-        // Optimistically update the UI
         const updatedManagers = managers.filter((_, i) => i !== index);
         setManagers(updatedManagers);
         recalculateManagementData(updatedManagers);
 
-        // Ensure documentId is available
         let currentDocumentId = documentId;
         if (!currentDocumentId) {
           const checkResponse = await fetch(`http://localhost:5000/management-control/${userId}`, {
@@ -150,7 +239,6 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
           setDocumentId(currentDocumentId);
         }
 
-        // Update backend
         const response = await fetch(`http://localhost:5000/management-control/${currentDocumentId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -166,7 +254,6 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
       } catch (error) {
         console.error('Error deleting manager:', error);
         alert(`Failed to delete manager: ${error.message}`);
-        // Re-fetch to restore state
         try {
           const response = await fetch(`http://localhost:5000/management-control/${userId}`, {
             method: 'GET',
@@ -230,7 +317,6 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
       } catch (error) {
         console.error('Error deleting management control data:', error);
         alert(`Failed to delete: ${error.message}`);
-        // Re-fetch to restore state
         try {
           const response = await fetch(`http://localhost:5000/management-control/${userId}`, {
             method: 'GET',
@@ -377,6 +463,23 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
         <h2 className="text-xl font-semibold mb-4">Management Control Details</h2>
 
         <form onSubmit={handleSubmit}>
+          {/* Manager CSV Upload */}
+          <div className="mb-6">
+            <h3 className="text-lg font-medium mb-2">Upload Managers CSV</h3>
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleManagerCSVUpload}
+              className="w-full p-2 border rounded"
+              disabled={isLoading}
+            />
+            <p className="text-sm text-gray-600 mt-2">
+              CSV file must contain headers: name, siteLocation, idNumber, position, jobTitle, race,
+              gender, isDisabled, votingRights, isExecutiveDirector, isIndependentNonExecutive
+            </p>
+          </div>
+
+          {/* Manager Input Form */}
           <div className="mb-6">
             <h3 className="text-lg font-medium mb-2">Add Manager</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -555,10 +658,10 @@ const ManagementControl = ({ userId, onClose, onSubmit }) => {
                     {managers.map((manager, index) => (
                       <tr key={manager.idNumber}>
                         <td className="border border-gray-300 px-4 py-2">{manager.name}</td>
-                        <td className="border border-gray-300 px-4 py-2">{manager.siteLocation}</td>
+                        <td className="border border-gray-300 px-4 py-2">{manager.siteLocation || 'N/A'}</td>
                         <td className="border border-gray-300 px-4 py-2">{manager.idNumber}</td>
                         <td className="border border-gray-300 px-4 py-2">{manager.position}</td>
-                        <td className="border border-gray-300 px-4 py-2">{manager.jobTitle}</td>
+                        <td className="border border-gray-300 px-4 py-2">{manager.jobTitle || 'N/A'}</td>
                         <td className="border border-gray-300 px-4 py-2">{manager.race}</td>
                         <td className="border border-gray-300 px-4 py-2">{manager.gender}</td>
                         <td className="border border-gray-300 px-4 py-2">{manager.isDisabled ? 'Yes' : 'No'}</td>
