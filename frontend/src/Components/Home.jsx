@@ -19,19 +19,19 @@ const Home = () => {
     companyName: '',
     yearEnd: '',
     sector: '',
-    turnover: 0,
-    npbt: 0,
-    npat: 0,
-    salaries: 0,
-    wages: 0,
-    directorsEmoluments: 0,
-    annualPayroll: 0,
-    expenses: 0,
-    costOfSales: 0,
-    depreciation: 0,
-    sdlPayments: 0,
-    totalLeviableAmount: 0,
-    totalMeasuredProcurementSpend: 0,
+    turnover: '',
+    npbt: '',
+    npat: '',
+    salaries: '',
+    wages: '',
+    directorsEmoluments: '',
+    annualPayroll: '',
+    expenses: '',
+    costOfSales: '',
+    depreciation: '',
+    sdlPayments: '',
+    totalLeviableAmount: '',
+    totalMeasuredProcurementSpend: '',
   });
 
   const [originalData, setOriginalData] = useState({ companyName: '', sector: '' });
@@ -223,7 +223,7 @@ const Home = () => {
     setFinancialData((prevData) => {
       const newData = {
         ...prevData,
-        [name]: name === "yearEnd" || name === "sector" ? value : Number(value) || 0,
+        [name]: value,
       };
       setIsDirty(
         newData.companyName !== originalData.companyName ||
@@ -238,19 +238,19 @@ const Home = () => {
       companyName: originalData.companyName || '',
       yearEnd: '',
       sector: originalData.sector || '',
-      turnover: 0,
-      npbt: 0,
-      npat: 0,
-      salaries: 0,
-      wages: 0,
-      directorsEmoluments: 0,
-      annualPayroll: 0,
-      expenses: 0,
-      costOfSales: 0,
-      depreciation: 0,
-      sdlPayments: 0,
-      totalLeviableAmount: 0,
-      totalMeasuredProcurementSpend: 0,
+      turnover: '',
+      npbt: '',
+      npat: '',
+      salaries: '',
+      wages: '',
+      directorsEmoluments: '',
+      annualPayroll: '',
+      expenses: '',
+      costOfSales: '',
+      depreciation: '',
+      sdlPayments: '',
+      totalLeviableAmount: '',
+      totalMeasuredProcurementSpend: '',
     });
     setOwnershipDetails(null);
     setManagementDetails(null);
@@ -389,7 +389,7 @@ const Home = () => {
 
     if (skillsDevelopmentDetails?.summary) {
       const totalExpenditure = skillsDevelopmentDetails.summary.totalDirectExpenditure || 0;
-      const targetSpend = financialData.totalLeviableAmount * scorecard.skillsDevelopment.target;
+      const targetSpend = (parseFloat(financialData.totalLeviableAmount) || 0) * scorecard.skillsDevelopment.target;
       const expenditureRatio = targetSpend > 0 ? totalExpenditure / targetSpend : 0;
       skillsDevelopmentScore = Math.min(expenditureRatio * scorecard.skillsDevelopment.weight, scorecard.skillsDevelopment.weight);
     }
@@ -401,7 +401,7 @@ const Home = () => {
     const enterpriseWeight = esdWeight / 2;
 
     if (supplierDevelopmentDetails?.localSummary) {
-      const totalProcurementSpend = financialData.totalMeasuredProcurementSpend || 1;
+      const totalProcurementSpend = (parseFloat(financialData.totalMeasuredProcurementSpend) || 0) || 1;
       const blackOwnedSpend = supplierDevelopmentDetails.localSummary.totalExpenditure *
         (supplierDevelopmentDetails.localSummary.blackOwnedSuppliers / (supplierDevelopmentDetails.localSummary.totalSuppliers || 1));
       const targetSpend = totalProcurementSpend * scorecard.esd.targetSupplier;
@@ -411,7 +411,7 @@ const Home = () => {
 
     if (enterpriseDevelopmentDetails?.summary) {
       const totalContribution = enterpriseDevelopmentDetails.summary.totalContribution || 0;
-      const targetContribution = financialData.npat * scorecard.esd.targetEnterprise;
+      const targetContribution = (parseFloat(financialData.npat) || 0) * scorecard.esd.targetEnterprise;
       const contributionRatio = targetContribution > 0 ? totalContribution / targetContribution : 0;
       enterpriseDevelopmentScore = Math.min(contributionRatio * enterpriseWeight, enterpriseWeight);
     }
@@ -420,7 +420,7 @@ const Home = () => {
 
     if (socioEconomicDevelopmentDetails?.summary) {
       const totalContribution = socioEconomicDevelopmentDetails.summary.totalContribution || 0;
-      const targetContribution = financialData.npat * scorecard.socioEconomicDevelopment.target;
+      const targetContribution = (parseFloat(financialData.npat) || 0) * scorecard.socioEconomicDevelopment.target;
       const contributionRatio = targetContribution > 0 ? totalContribution / targetContribution : 0;
       socioEconomicDevelopmentScore = Math.min(contributionRatio * scorecard.socioEconomicDevelopment.weight, scorecard.socioEconomicDevelopment.weight);
     }
